@@ -1,0 +1,39 @@
+# Blueprint Render per il backend di Sitevaro (versione in un unico file).
+# Deploy: dashboard Render → New → Blueprint → seleziona la repo → Apply.
+# Render chiede i valori delle env con "sync: false" al momento dell'Apply.
+# La repo deve contenere solo: server.js, package.json, render.yaml.
+
+services:
+  - type: web
+    name: sitevaro-backend
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    # Il server esegue il seed dei template da solo a ogni avvio (idempotente:
+    # non duplica i template e non tocca utenti/siti/abbonamenti), quindi qui
+    # basta avviare l'app. Il disco è montato solo a runtime.
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    disk:
+      name: sitevaro-data
+      # Percorso assoluto obbligatorio su Render: equivale a ./data nella repo
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
+    envVars:
+      # Versione Node uguale a quella di sviluppo locale
+      - key: NODE_VERSION
+        value: 24.20.0
+      # Segreto JWT generato automaticamente da Render
+      - key: JWT_SECRET
+        generateValue: true
+      # Chiave segreta Stripe (dashboard Stripe → Sviluppatori → Chiavi API).
+      # Per provare: sk_test_... ; per incassare davvero: sk_live_...
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      # Segreto di firma del webhook Stripe (whsec_...), vedi README "Deploy su Render"
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      # URL pubblico del servizio, es. https://sitevaro-backend.onrender.com
+      # (da impostare DOPO il primo deploy, quando Render assegna l'URL)
+      - key: BASE_URL
+        sync: false
