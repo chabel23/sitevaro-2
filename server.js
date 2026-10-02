@@ -486,14 +486,14 @@ function stripeClient() {
   return require('stripe')(key);
 }
 
-// Allowlist dei prezzi reali (modalità TEST, account CLARIVO)
+// Allowlist dei prezzi reali (modalità TEST, account CLARIVO) — prezzi aggiornati 2026-10-02
 const PREZZI = {
-  'price_1ULk2cHOHbkO5FAonIQgMeug': { piano: 'Base', periodo: 'mese', importo: '€9/mese' },
-  'price_1ULk2cHOHbkO5FAoSaCGAKPV': { piano: 'Pro', periodo: 'mese', importo: '€19/mese' },
-  'price_1ULk2cHOHbkO5FAo3ofMVXCu': { piano: 'E-commerce', periodo: 'mese', importo: '€29/mese' },
-  'price_1ULk2gHOHbkO5FAoFmTAKXnG': { piano: 'Base', periodo: 'anno', importo: '€90/anno' },
-  'price_1ULk2gHOHbkO5FAo8BxQ78M9': { piano: 'Pro', periodo: 'anno', importo: '€190/anno' },
-  'price_1ULk2gHOHbkO5FAoV3Hs3jHI': { piano: 'E-commerce', periodo: 'anno', importo: '€290/anno' },
+  'price_1ULt9qHOHbkO5FAoxAdgUvMO': { piano: 'Base', periodo: 'mese', importo: '€29,99/mese' },
+  'price_1ULt9rHOHbkO5FAo6Gzsli9V': { piano: 'Pro', periodo: 'mese', importo: '€39,99/mese' },
+  'price_1ULt9tHOHbkO5FAoGY9VCSJa': { piano: 'Max', periodo: 'mese', importo: '€59,99/mese' },
+  'price_1ULt9uHOHbkO5FAoJMdcRIOw': { piano: 'Base', periodo: 'anno', importo: '€299,90/anno' },
+  'price_1ULt9vHOHbkO5FAoADkFz887': { piano: 'Pro', periodo: 'anno', importo: '€399,90/anno' },
+  'price_1ULt9xHOHbkO5FAo464JSaqd': { piano: 'Max', periodo: 'anno', importo: '€599,90/anno' },
 };
 
 /* ==========================================================================
