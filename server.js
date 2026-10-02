@@ -800,6 +800,24 @@ app.get('/api/salute', (req, res) => res.json({ ok: true, servizio: 'sitevaro-ba
 // Health check per Render (healthCheckPath in render.yaml)
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// Vetrina pubblica Sitevaro servita alla radice: stesso server dell'API,
+// così la pagina parla con le API in stessa origine e nessun filtro esterno
+// può bloccarla. Il CSP di helmet è troppo stretto per la pagina (script
+// inline), quindi per questa sola rotta lo sostituiamo con uno permissivo.
+let vetrinaHtml = null;
+try {
+  vetrinaHtml = fs.readFileSync(path.join(__dirname, 'vetrina.html'), 'utf8');
+} catch (e) {
+  console.warn('⚠️  vetrina.html non trovata: la vetrina alla radice non sarà servita.');
+}
+app.get('/', (req, res) => {
+  if (!vetrinaHtml) return res.status(503).send('Vetrina non disponibile');
+  res.setHeader('Content-Security-Policy',
+    "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'");
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.type('html').send(vetrinaHtml);
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/checkout', checkoutRoutes);
