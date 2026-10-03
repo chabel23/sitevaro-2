@@ -1805,7 +1805,14 @@
               else openAuth('login');
             });
           }
-          if (authToken) window.setTimeout(loadSiti, 800);
+          if (authToken) {
+            window.setTimeout(function () {
+              if (areaSection) areaSection.scrollIntoView({ behavior: 'smooth' });
+              loadSiti();
+            }, 1200);
+          } else {
+            window.setTimeout(function () { openAuth('login'); }, 1200);
+          }
         } else {
           title.textContent = nt('annullato');
           if (sub) sub.textContent = '';
