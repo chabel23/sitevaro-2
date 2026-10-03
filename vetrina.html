@@ -2139,5 +2139,302 @@
 
 </script>
 <!-- svm-fine -->
+<!-- svs-inizio -->
+<style id="svs-style">
+#svs-root{max-width:1100px;margin:0 auto 2rem;padding:0 1.5rem;font-family:inherit}
+#svs-root .svs-title{font-size:1.6rem;margin:0 0 .25rem}
+#svs-root .svs-sub{color:#5b655c;font-size:.95rem;margin:.25rem 0 .75rem}
+#svs-root .svs-card{background:#fff;border:1px solid #e4ddca;border-radius:16px;padding:1.25rem 1.5rem;margin:1rem 0;box-shadow:0 2px 10px rgba(20,35,26,.05)}
+#svs-root .svs-card h3{font-size:1.25rem;margin:.1rem 0 .6rem}
+#svs-root .svs-chip{background:#f3e7d3;color:#8a5a12;border-radius:999px;padding:.3rem .8rem;font-size:.85rem;font-weight:600;white-space:nowrap}
+#svs-root .svs-chip-on{background:#dcefe0;color:#14632e}
+#svs-root .svs-row-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
+#svs-root .svs-form{display:grid;gap:.8rem;margin-top:.5rem}
+#svs-root label{display:grid;gap:.3rem;font-weight:600;font-size:.92rem}
+#svs-root input,#svs-root textarea{font:inherit;font-weight:400;padding:.6rem .8rem;border:1px solid #cfc8b2;border-radius:10px;background:#fbf9f3;width:100%;box-sizing:border-box}
+#svs-root .svs-2col{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
+@media(max-width:640px){#svs-root .svs-2col{grid-template-columns:1fr}}
+#svs-root .svs-btn{background:#16241c;color:#fff;border:0;border-radius:999px;padding:.8rem 1.6rem;font:inherit;font-weight:700;cursor:pointer;justify-self:start}
+#svs-root .svs-btn:disabled{opacity:.55;cursor:wait}
+#svs-root .svs-btn-soft{background:#f3e7d3;color:#16241c}
+#svs-root .svs-msg{border-radius:10px;padding:.7rem 1rem;margin:0}
+#svs-root .svs-msg-ok{background:#e3f3e6;color:#14532d}
+#svs-root .svs-msg-ko{background:#fbe7e1;color:#8c2b12}
+#svs-root .svs-fattura{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding:.55rem 0;border-bottom:1px solid #eee6cf}
+#svs-root .svs-fattura:last-child{border-bottom:0}
+#svs-root .svs-link{color:#16241c;font-weight:700}
+#svs-root .svs-actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.4rem}
+</style>
+<script>
+/* Sitevaro — Area cliente: abbonamento, fatture e impostazioni account.
+   Blocco autonomo: usa il token in localStorage (sitevaro_token) e le API
+   /api/account + /api/auth del backend. Si inserisce dopo il modulo materiali. */
+(function () {
+  'use strict';
+
+  var API = 'https://sitevaro-backend-6qm3.onrender.com';
+  if (location.origin && location.origin.indexOf('onrender.com') !== -1) API = location.origin;
+
+  var root = document.createElement('div');
+  root.id = 'svs-root';
+  root.hidden = true;
+
+  var rendered = false;
+  var rendering = false;
+
+  function token() {
+    try { return localStorage.getItem('sitevaro_token') || ''; } catch (e) { return ''; }
+  }
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+  function api(path, opts) {
+    opts = opts || {};
+    opts.headers = opts.headers || {};
+    opts.headers['Authorization'] = 'Bearer ' + token();
+    if (opts.body) opts.headers['Content-Type'] = 'application/json';
+    return fetch(API + path, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok) throw new Error(d.errore || 'Qualcosa è andato storto');
+        return d;
+      });
+    });
+  }
+  function dataIt(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  function soldi(f) {
+    try {
+      return new Intl.NumberFormat('it-IT', { style: 'currency', currency: f.valuta || 'EUR' }).format(f.importo || 0);
+    } catch (e) { return '€ ' + (f.importo || 0); }
+  }
+  var STATO_FATTURA = { paid: 'Pagata', open: 'Da pagare', draft: 'Bozza', void: 'Annullata', uncollectible: 'Annullata' };
+
+  function sezioneAbbonamento(abbonamenti, fatture) {
+    var attivi = (abbonamenti || []).filter(function (a) { return a.stato === 'attivo'; });
+    var html = '<div class="svs-card"><h3>Il tuo abbonamento</h3>';
+    if (!attivi.length) {
+      html += '<p class="svs-sub">Non hai ancora un abbonamento attivo. Quando scegli un design e completi il pagamento, qui trovi piano, rinnovi e fatture.</p>';
+    } else {
+      html += attivi.map(function (a) {
+        var piano = a.piano || 'Sitevaro';
+        var riga = '<div class="svs-row-head"><div><strong>Piano ' + esc(piano) + '</strong>' +
+          (a.importo ? '<div class="svs-sub">' + esc(a.importo) + '</div>' : '') + '</div>' +
+          '<span class="svs-chip svs-chip-on">Attivo</span></div>';
+        if (a.cancella_a_fine_periodo && a.prossimo_rinnovo) {
+          riga += '<p class="svs-sub">Hai chiesto la chiusura: l’abbonamento si ferma il ' + esc(dataIt(a.prossimo_rinnovo)) + ' e il sito resterà online fino a quel giorno.</p>';
+        } else if (a.prossimo_rinnovo) {
+          riga += '<p class="svs-sub">Prossimo rinnovo: ' + esc(dataIt(a.prossimo_rinnovo)) + '</p>';
+        }
+        return riga;
+      }).join('');
+      html += '<div class="svs-actions"><button class="svs-btn" id="svs-portale" type="button">Gestisci abbonamento e carta di pagamento</button></div>' +
+        '<p class="svs-sub">Da lì puoi aggiornare la carta, scaricare le fatture e — se serve — chiudere l’abbonamento.</p>' +
+        '<p class="svs-msg" id="svs-msg-abb" hidden></p>';
+    }
+    html += '</div>';
+
+    html += '<div class="svs-card"><h3>Le tue fatture</h3>';
+    if (!fatture || !fatture.length) {
+      html += '<p class="svs-sub">Nessuna fattura ancora: compariranno qui dopo il primo pagamento.</p>';
+    } else {
+      html += fatture.map(function (f) {
+        var links = [];
+        if (f.url) links.push('<a class="svs-link" href="' + esc(f.url) + '" target="_blank" rel="noopener">Vedi</a>');
+        if (f.pdf) links.push('<a class="svs-link" href="' + esc(f.pdf) + '" target="_blank" rel="noopener">PDF</a>');
+        return '<div class="svs-fattura"><span>' + esc(dataIt(f.data)) +
+          (f.numero ? ' · Fattura ' + esc(f.numero) : '') + ' · ' + esc(STATO_FATTURA[f.stato] || f.stato) + '</span>' +
+          '<span><strong>' + esc(soldi(f)) + '</strong>' + (links.length ? ' · ' + links.join(' · ') : '') + '</span></div>';
+      }).join('');
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function sezioneImpostazioni(u) {
+    return '<div class="svs-card"><h3>Impostazioni account</h3>' +
+      '<div class="svs-form">' +
+        '<label>Il tuo nome <input id="svs-nome" type="text" value="' + esc(u.nome || '') + '" placeholder="Es. Mario Rossi"></label>' +
+        '<div class="svs-actions"><button class="svs-btn svs-btn-soft" id="svs-salva-nome" type="button">Salva nome</button></div>' +
+        '<p class="svs-sub">Email attuale: <strong>' + esc(u.email) + '</strong>' + (u.created_at ? ' · Account creato il ' + esc(dataIt(u.created_at)) : '') + '</p>' +
+        '<div class="svs-2col">' +
+          '<label>Nuova email <input id="svs-nuova-email" type="email" placeholder="La nuova email"></label>' +
+          '<label>Password (per confermare) <input id="svs-email-pass" type="password" placeholder="La tua password"></label>' +
+        '</div>' +
+        '<div class="svs-actions"><button class="svs-btn svs-btn-soft" id="svs-salva-email" type="button">Cambia email</button></div>' +
+        '<div class="svs-2col">' +
+          '<label>Password attuale <input id="svs-pass-attuale" type="password" placeholder="Password attuale"></label>' +
+          '<label>Nuova password <input id="svs-pass-nuova" type="password" placeholder="Almeno 8 caratteri"></label>' +
+        '</div>' +
+        '<label>Conferma nuova password <input id="svs-pass-conferma" type="password" placeholder="Ripeti la nuova password"></label>' +
+        '<div class="svs-actions"><button class="svs-btn svs-btn-soft" id="svs-salva-pass" type="button">Cambia password</button>' +
+        '<button class="svs-btn svs-btn-soft" id="svs-logout" type="button">Esci dall’account</button></div>' +
+        '<p class="svs-msg" id="svs-msg-imp" hidden></p>' +
+      '</div></div>' +
+      '<div class="svs-card"><h3>Assistenza</h3>' +
+      '<p class="svs-sub">Hai bisogno di aiuto o vuoi una modifica al tuo sito? Scrivici qui: pensiamo noi a tutto, la manutenzione è inclusa nel tuo piano.</p>' +
+      '<div class="svs-form"><label>Il tuo messaggio <textarea id="svs-assistenza-testo" rows="4" placeholder="Es. Potete cambiare il numero di telefono sul sito?"></textarea></label>' +
+      '<div class="svs-actions"><button class="svs-btn" id="svs-assistenza-invia" type="button">Invia messaggio</button></div>' +
+      '<p class="svs-msg" id="svs-msg-ass" hidden></p></div></div>' +
+      '<div id="svs-admin-slot"></div>';
+  }
+
+  function sezioneMessaggi(list) {
+    var html = '<div class="svs-card"><h3>Messaggi dei clienti</h3>';
+    if (!list.length) {
+      html += '<p class="svs-sub">Nessun messaggio dai clienti.</p>';
+    } else {
+      html += list.map(function (m) {
+        var chi = (m.nome_cliente ? m.nome_cliente + ' · ' : '') + (m.email_cliente || '');
+        return '<div class="svs-fattura" style="display:block"><strong>' + esc(chi) + '</strong>' +
+          ' <span class="svs-sub">' + esc(dataIt(m.created_at)) + '</span>' +
+          '<div style="white-space:pre-wrap;margin-top:.3rem">' + esc(m.testo) + '</div></div>';
+      }).join('');
+    }
+    return html + '</div>';
+  }
+
+  function collega(u) {
+    function msg(id, ok, testo) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.hidden = false;
+      el.className = 'svs-msg ' + (ok ? 'svs-msg-ok' : 'svs-msg-ko');
+      el.textContent = testo;
+    }
+    var btnPortale = document.getElementById('svs-portale');
+    if (btnPortale) btnPortale.addEventListener('click', function () {
+      btnPortale.disabled = true;
+      btnPortale.textContent = 'Apro la gestione…';
+      api('/api/account/portale', { method: 'POST', body: '{}' })
+        .then(function (d) { window.location.href = d.url; })
+        .catch(function (e) {
+          btnPortale.disabled = false;
+          btnPortale.textContent = 'Gestisci abbonamento e carta di pagamento';
+          msg('svs-msg-abb', false, e.message);
+        });
+    });
+
+    var btnNome = document.getElementById('svs-salva-nome');
+    if (btnNome) btnNome.addEventListener('click', function () {
+      btnNome.disabled = true;
+      api('/api/auth/profilo', { method: 'PATCH', body: JSON.stringify({ nome: document.getElementById('svs-nome').value }) })
+        .then(function (d) {
+          try { localStorage.setItem('sitevaro_user', JSON.stringify(d.utente)); } catch (e) {}
+          msg('svs-msg-imp', true, 'Nome salvato. Aggiorno la pagina…');
+          window.setTimeout(function () { window.location.reload(); }, 900);
+        })
+        .catch(function (e) { btnNome.disabled = false; msg('svs-msg-imp', false, e.message); });
+    });
+
+    var btnEmail = document.getElementById('svs-salva-email');
+    if (btnEmail) btnEmail.addEventListener('click', function () {
+      var nuova = document.getElementById('svs-nuova-email').value.trim();
+      var pass = document.getElementById('svs-email-pass').value;
+      if (!nuova || !pass) { msg('svs-msg-imp', false, 'Scrivi la nuova email e la password per confermare.'); return; }
+      btnEmail.disabled = true;
+      api('/api/auth/cambia-email', { method: 'POST', body: JSON.stringify({ password: pass, nuovaEmail: nuova }) })
+        .then(function (d) {
+          try {
+            if (d.token) localStorage.setItem('sitevaro_token', d.token);
+            if (d.utente) localStorage.setItem('sitevaro_user', JSON.stringify(d.utente));
+          } catch (e) {}
+          msg('svs-msg-imp', true, 'Email aggiornata. D’ora in poi accedi con ' + nuova + '. Aggiorno la pagina…');
+          window.setTimeout(function () { window.location.reload(); }, 1400);
+        })
+        .catch(function (e) { btnEmail.disabled = false; msg('svs-msg-imp', false, e.message); });
+    });
+
+    var btnPass = document.getElementById('svs-salva-pass');
+    if (btnPass) btnPass.addEventListener('click', function () {
+      var attuale = document.getElementById('svs-pass-attuale').value;
+      var nuova = document.getElementById('svs-pass-nuova').value;
+      var conferma = document.getElementById('svs-pass-conferma').value;
+      if (nuova.length < 8) { msg('svs-msg-imp', false, 'La nuova password deve avere almeno 8 caratteri.'); return; }
+      if (nuova !== conferma) { msg('svs-msg-imp', false, 'Le due nuove password non coincidono.'); return; }
+      btnPass.disabled = true;
+      api('/api/auth/cambia-password', { method: 'POST', body: JSON.stringify({ passwordAttuale: attuale, nuovaPassword: nuova }) })
+        .then(function () {
+          document.getElementById('svs-pass-attuale').value = '';
+          document.getElementById('svs-pass-nuova').value = '';
+          document.getElementById('svs-pass-conferma').value = '';
+          btnPass.disabled = false;
+          msg('svs-msg-imp', true, 'Password aggiornata.');
+        })
+        .catch(function (e) { btnPass.disabled = false; msg('svs-msg-imp', false, e.message); });
+    });
+
+    var btnOut = document.getElementById('svs-logout');
+    if (btnOut) btnOut.addEventListener('click', function () {
+      try { localStorage.removeItem('sitevaro_token'); localStorage.removeItem('sitevaro_user'); } catch (e) {}
+      window.location.reload();
+    });
+
+    var btnAss = document.getElementById('svs-assistenza-invia');
+    if (btnAss) btnAss.addEventListener('click', function () {
+      var testo = document.getElementById('svs-assistenza-testo').value.trim();
+      if (testo.length < 3) { msg('svs-msg-ass', false, 'Scrivi un messaggio un po’ più lungo.'); return; }
+      btnAss.disabled = true;
+      api('/api/account/assistenza', { method: 'POST', body: JSON.stringify({ testo: testo }) })
+        .then(function () {
+          document.getElementById('svs-assistenza-testo').value = '';
+          btnAss.disabled = false;
+          msg('svs-msg-ass', true, 'Messaggio inviato! Ti risponde il team Sitevaro.');
+        })
+        .catch(function (e) { btnAss.disabled = false; msg('svs-msg-ass', false, e.message); });
+    });
+  }
+
+  function render() {
+    rendering = true;
+    Promise.all([
+      api('/api/auth/me'),
+      api('/api/account/abbonamento').catch(function () { return { abbonamenti: [] }; }),
+      api('/api/account/fatture').catch(function () { return { fatture: [] }; })
+    ]).then(function (r) {
+      var u = (r[0] && r[0].utente) || {};
+      root.innerHTML = '<h3 class="svs-title">Abbonamento e impostazioni</h3>' +
+        '<p class="svs-sub">Qui gestisci il tuo piano, le fatture e i dati del tuo account.</p>' +
+        sezioneAbbonamento(r[1].abbonamenti || [], r[2].fatture || []) +
+        sezioneImpostazioni(u);
+      root.hidden = false;
+      rendered = true;
+      rendering = false;
+      collega(u);
+      if (u.is_admin) {
+        api('/api/admin/messaggi').then(function (d) {
+          var slot = document.getElementById('svs-admin-slot');
+          if (slot) slot.innerHTML = sezioneMessaggi(d.messaggi || []);
+        }).catch(function () {});
+      }
+    }).catch(function () {
+      rendering = false;
+    });
+  }
+
+  function init() {
+    var svm = document.getElementById('svm-root');
+    var area = document.getElementById('area-cliente');
+    if (svm && svm.parentNode) svm.parentNode.insertBefore(root, svm.nextSibling);
+    else if (area && area.parentNode) area.parentNode.insertBefore(root, area.nextSibling);
+    else document.body.appendChild(root);
+    window.setInterval(function () {
+      var t = token();
+      if (t && !rendered && !rendering) render();
+      if (!t && rendered) { root.innerHTML = ''; root.hidden = true; rendered = false; }
+    }, 1500);
+    if (token()) render();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+<!-- svs-fine -->
 </body>
 </html>

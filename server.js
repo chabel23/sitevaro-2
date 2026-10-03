@@ -103,6 +103,14 @@ CREATE TABLE IF NOT EXISTS materiali (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_materiali_sito ON materiali(sito_id);
+
+CREATE TABLE IF NOT EXISTS messaggi (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  utente_id INTEGER NOT NULL REFERENCES utenti(id),
+  testo TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_messaggi_utente ON messaggi(utente_id);
 `);
 
 // Stato di lavorazione del sito (flusso fatto-per-te): i siti già esistenti
@@ -114,6 +122,17 @@ try {
   }
 } catch (e) {
   console.error('Migrazione colonna lavorazione fallita:', e.message);
+}
+
+// Nome visualizzato del cliente: la vetrina lo chiede in registrazione e
+// lo mostra nel saluto ("Ciao, <nome>") e nelle Impostazioni account.
+try {
+  const colonneUtenti = db.prepare('PRAGMA table_info(utenti)').all().map((c) => c.name);
+  if (!colonneUtenti.includes('nome')) {
+    db.exec("ALTER TABLE utenti ADD COLUMN nome TEXT NOT NULL DEFAULT ''");
+  }
+} catch (e) {
+  console.error('Migrazione colonna nome fallita:', e.message);
 }
 
 // Cartella dei file caricati dai clienti (foto e logo), sullo stesso disco dati
@@ -487,7 +506,7 @@ function richiedeAuth(req, res, next) {
   if (!token) return res.status(401).json({ errore: 'Autenticazione richiesta' });
   try {
     const payload = jwt.verify(token, getJwtSecret());
-    const utente = db.prepare('SELECT id, email, is_admin, created_at FROM utenti WHERE id = ?').get(payload.id);
+    const utente = db.prepare('SELECT id, email, nome, is_admin, created_at FROM utenti WHERE id = ?').get(payload.id);
     if (!utente) return res.status(401).json({ errore: 'Utente non trovato' });
     req.utente = utente;
     next();
@@ -535,9 +554,9 @@ function emailValida(email) {
   return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
-// POST /api/auth/register { email, password }
+// POST /api/auth/register { nome?, email, password }
 authRoutes.post('/register', (req, res) => {
-  const { email, password } = req.body || {};
+  const { nome, email, password } = req.body || {};
   if (!emailValida(email)) return res.status(400).json({ errore: 'Email non valida' });
   if (typeof password !== 'string' || password.length < 8) {
     return res.status(400).json({ errore: 'La password deve avere almeno 8 caratteri' });
@@ -546,9 +565,10 @@ authRoutes.post('/register', (req, res) => {
   const esiste = db.prepare('SELECT id FROM utenti WHERE email = ?').get(emailNorm);
   if (esiste) return res.status(409).json({ errore: 'Email già registrata' });
 
+  const nomeNorm = typeof nome === 'string' ? nome.trim().slice(0, 80) : '';
   const password_hash = bcrypt.hashSync(password, 10);
-  const info = db.prepare('INSERT INTO utenti (email, password_hash) VALUES (?, ?)').run(emailNorm, password_hash);
-  const utente = db.prepare('SELECT id, email, is_admin, created_at FROM utenti WHERE id = ?').get(info.lastInsertRowid);
+  const info = db.prepare('INSERT INTO utenti (email, nome, password_hash) VALUES (?, ?, ?)').run(emailNorm, nomeNorm, password_hash);
+  const utente = db.prepare('SELECT id, email, nome, is_admin, created_at FROM utenti WHERE id = ?').get(info.lastInsertRowid);
   res.status(201).json({ utente, token: firmaToken(utente) });
 });
 
@@ -562,13 +582,52 @@ authRoutes.post('/login', (req, res) => {
   if (!row || !bcrypt.compareSync(password, row.password_hash)) {
     return res.status(401).json({ errore: 'Credenziali non valide' });
   }
-  const utente = { id: row.id, email: row.email, is_admin: !!row.is_admin, created_at: row.created_at };
+  const utente = { id: row.id, email: row.email, nome: row.nome || '', is_admin: !!row.is_admin, created_at: row.created_at };
   res.json({ utente, token: firmaToken(utente) });
 });
 
 // GET /api/auth/me
 authRoutes.get('/me', richiedeAuth, (req, res) => {
   res.json({ utente: req.utente });
+});
+
+// PATCH /api/auth/profilo { nome } — nome visualizzato dell'account
+authRoutes.patch('/profilo', richiedeAuth, (req, res) => {
+  const nome = typeof (req.body && req.body.nome) === 'string' ? req.body.nome.trim().slice(0, 80) : '';
+  db.prepare('UPDATE utenti SET nome = ? WHERE id = ?').run(nome, req.utente.id);
+  const utente = db.prepare('SELECT id, email, nome, is_admin, created_at FROM utenti WHERE id = ?').get(req.utente.id);
+  res.json({ utente });
+});
+
+// POST /api/auth/cambia-password { passwordAttuale, nuovaPassword }
+authRoutes.post('/cambia-password', richiedeAuth, (req, res) => {
+  const { passwordAttuale, nuovaPassword } = req.body || {};
+  if (typeof nuovaPassword !== 'string' || nuovaPassword.length < 8) {
+    return res.status(400).json({ errore: 'La nuova password deve avere almeno 8 caratteri' });
+  }
+  const row = db.prepare('SELECT password_hash FROM utenti WHERE id = ?').get(req.utente.id);
+  if (!row || typeof passwordAttuale !== 'string' || !bcrypt.compareSync(passwordAttuale, row.password_hash)) {
+    return res.status(401).json({ errore: 'La password attuale non è corretta' });
+  }
+  db.prepare('UPDATE utenti SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(nuovaPassword, 10), req.utente.id);
+  res.json({ ok: true });
+});
+
+// POST /api/auth/cambia-email { password, nuovaEmail } — restituisce un token nuovo
+authRoutes.post('/cambia-email', richiedeAuth, (req, res) => {
+  const { password, nuovaEmail } = req.body || {};
+  if (!emailValida(nuovaEmail)) return res.status(400).json({ errore: 'Email non valida' });
+  const emailNorm = nuovaEmail.trim().toLowerCase();
+  if (emailNorm === req.utente.email) return res.status(400).json({ errore: 'È già la tua email' });
+  const row = db.prepare('SELECT password_hash FROM utenti WHERE id = ?').get(req.utente.id);
+  if (!row || typeof password !== 'string' || !bcrypt.compareSync(password, row.password_hash)) {
+    return res.status(401).json({ errore: 'Password non corretta' });
+  }
+  const esiste = db.prepare('SELECT id FROM utenti WHERE email = ? AND id != ?').get(emailNorm, req.utente.id);
+  if (esiste) return res.status(409).json({ errore: 'Email già usata da un altro account' });
+  db.prepare('UPDATE utenti SET email = ? WHERE id = ?').run(emailNorm, req.utente.id);
+  const utente = db.prepare('SELECT id, email, nome, is_admin, created_at FROM utenti WHERE id = ?').get(req.utente.id);
+  res.json({ utente, token: firmaToken(utente) });
 });
 
 /* ---- 8.2 Template (equivalente di src/routes/templates.js) ------------- */
@@ -894,6 +953,118 @@ adminRoutes.put('/siti/:id/contenuti', richiedeAuth, richiedeAdmin, (req, res) =
   res.json({ sito: serializzaSito(sitoConTemplate(sito.id)) });
 });
 
+// GET /api/admin/messaggi — messaggi di assistenza scritti dai clienti
+adminRoutes.get('/messaggi', richiedeAuth, richiedeAdmin, (req, res) => {
+  const rows = db.prepare(`
+    SELECT m.id, m.testo, m.created_at, u.email AS email_cliente, u.nome AS nome_cliente
+    FROM messaggi m JOIN utenti u ON u.id = m.utente_id
+    ORDER BY m.id DESC LIMIT 50
+  `).all();
+  res.json({ messaggi: rows });
+});
+
+/* ---- 8.9 Account cliente: abbonamento, fatture, portale Stripe -------- */
+
+const accountRoutes = express.Router();
+
+// Cliente Stripe dell'utente: lo ricaviamo dall'ultima sottoscrizione
+// registrata (nel DB non salviamo il customer id separatamente).
+async function clienteStripeDi(utenteId) {
+  const stripe = stripeClient();
+  if (!stripe) return { stripe: null, customerId: null };
+  const abb = db.prepare(
+    'SELECT stripe_subscription_id FROM abbonamenti WHERE utente_id = ? AND stripe_subscription_id IS NOT NULL ORDER BY id DESC LIMIT 1'
+  ).get(utenteId);
+  if (!abb) return { stripe, customerId: null };
+  try {
+    const sub = await stripe.subscriptions.retrieve(abb.stripe_subscription_id);
+    return { stripe, customerId: sub.customer || null };
+  } catch (e) {
+    return { stripe, customerId: null };
+  }
+}
+
+// GET /api/account/abbonamento — piani dell'utente con stato e prossimo rinnovo
+accountRoutes.get('/abbonamento', richiedeAuth, async (req, res) => {
+  const rows = db.prepare('SELECT * FROM abbonamenti WHERE utente_id = ? ORDER BY id DESC').all(req.utente.id);
+  const stripe = stripeClient();
+  const abbonamenti = [];
+  for (const a of rows) {
+    const info = PREZZI[a.price_id] || null;
+    const voce = {
+      id: a.id,
+      stato: a.stato,
+      piano: info ? info.piano : null,
+      importo: info ? info.importo : null,
+      periodo: info ? info.periodo : null,
+      dal: a.created_at,
+      prossimo_rinnovo: null,
+      cancella_a_fine_periodo: false,
+    };
+    if (stripe && a.stripe_subscription_id && a.stato === 'attivo') {
+      try {
+        const sub = await stripe.subscriptions.retrieve(a.stripe_subscription_id);
+        voce.prossimo_rinnovo = sub.current_period_end
+          ? new Date(sub.current_period_end * 1000).toISOString() : null;
+        voce.cancella_a_fine_periodo = !!sub.cancel_at_period_end;
+      } catch (e) { /* Stripe non raggiungibile: restano i dati del DB */ }
+    }
+    abbonamenti.push(voce);
+  }
+  res.json({ abbonamenti });
+});
+
+// GET /api/account/fatture — ultime fatture Stripe dell'utente
+accountRoutes.get('/fatture', richiedeAuth, async (req, res) => {
+  const { stripe, customerId } = await clienteStripeDi(req.utente.id);
+  if (!stripe || !customerId) return res.json({ fatture: [] });
+  try {
+    const lista = await stripe.invoices.list({ customer: customerId, limit: 12 });
+    const fatture = (lista.data || []).map((inv) => ({
+      id: inv.id,
+      numero: inv.number || '',
+      data: inv.created ? new Date(inv.created * 1000).toISOString() : null,
+      importo: (inv.amount_paid || inv.total || 0) / 100,
+      valuta: (inv.currency || 'eur').toUpperCase(),
+      stato: inv.status || '',
+      url: inv.hosted_invoice_url || null,
+      pdf: inv.invoice_pdf || null,
+    }));
+    res.json({ fatture });
+  } catch (e) {
+    res.json({ fatture: [] });
+  }
+});
+
+// POST /api/account/portale — sessione del portale clienti Stripe
+// (carta di pagamento, fatture, cancellazione: li gestisce Stripe)
+accountRoutes.post('/portale', richiedeAuth, async (req, res) => {
+  const { stripe, customerId } = await clienteStripeDi(req.utente.id);
+  if (!stripe) return res.status(503).json({ errore: 'Pagamenti non configurati sul server' });
+  if (!customerId) return res.status(400).json({ errore: 'Nessun abbonamento da gestire' });
+  const baseUrl = (process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`).replace(/\/$/, '');
+  try {
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: `${baseUrl}/`,
+    });
+    res.json({ url: session.url });
+  } catch (e) {
+    console.error('Errore portale Stripe:', e.message);
+    res.status(502).json({ errore: 'Impossibile aprire la gestione abbonamento', dettaglio: e.message });
+  }
+});
+
+// POST /api/account/assistenza { testo } — messaggio di assistenza del cliente.
+// Nessuna email esposta sul sito: l'operatore li legge nel pannello admin.
+accountRoutes.post('/assistenza', richiedeAuth, (req, res) => {
+  const testo = typeof (req.body && req.body.testo) === 'string' ? req.body.testo.trim() : '';
+  if (testo.length < 3) return res.status(400).json({ errore: 'Scrivi un messaggio un po’ più lungo' });
+  if (testo.length > 4000) return res.status(400).json({ errore: 'Messaggio troppo lungo' });
+  db.prepare('INSERT INTO messaggi (utente_id, testo) VALUES (?, ?)').run(req.utente.id, testo);
+  res.json({ ok: true });
+});
+
 /* ==========================================================================
  * 9. AVVIO — seed automatico, app Express, ascolto (come src/index.js)
  * ========================================================================== */
@@ -964,6 +1135,7 @@ app.use('/api/templates', templateRoutes);
 app.use('/api/checkout', checkoutRoutes);
 app.use('/api/sites', sitiApi);
 app.use('/api/admin', adminRoutes);
+app.use('/api/account', accountRoutes);
 app.use('/', sitiPubblico); // GET /s/:slug
 
 // 404 JSON per le API
