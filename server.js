@@ -94,7 +94,31 @@ CREATE TABLE IF NOT EXISTS abbonamenti (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_abb_utente ON abbonamenti(utente_id);
+
+CREATE TABLE IF NOT EXISTS materiali (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sito_id INTEGER NOT NULL REFERENCES siti(id),
+  utente_id INTEGER NOT NULL REFERENCES utenti(id),
+  dati_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_materiali_sito ON materiali(sito_id);
 `);
+
+// Stato di lavorazione del sito (flusso fatto-per-te): i siti già esistenti
+// lo ricevono come 'in-attesa-materiali'.
+try {
+  const colonneSiti = db.prepare('PRAGMA table_info(siti)').all().map((c) => c.name);
+  if (!colonneSiti.includes('lavorazione')) {
+    db.exec("ALTER TABLE siti ADD COLUMN lavorazione TEXT NOT NULL DEFAULT 'in-attesa-materiali'");
+  }
+} catch (e) {
+  console.error('Migrazione colonna lavorazione fallita:', e.message);
+}
+
+// Cartella dei file caricati dai clienti (foto e logo), sullo stesso disco dati
+const UPLOAD_DIR = path.join(path.dirname(DB_PATH), 'uploads');
+try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch (e) { /* creata al primo upload */ }
 
 /* ==========================================================================
  * 2. CATALOGO (equivalente di src/lib/catalog.js)
@@ -248,7 +272,9 @@ function hero(contenuti, palette, layout) {
       <div style="flex:1;min-width:260px"><h1 style="font-size:2.6rem;margin:0 0 1rem">${titolo}</h1>
       <p style="font-size:1.2rem;color:${palette.secondaria}">${tagline}</p>
       <p>${esc(contenuti.descrizione)}</p></div>
-      <div style="flex:1;min-width:260px;background:${palette.accento};border-radius:16px;min-height:280px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.1rem">La tua foto qui</div></section>`;
+      ${Array.isArray(contenuti.foto) && contenuti.foto[0]
+        ? `<div style="flex:1;min-width:260px;border-radius:16px;min-height:280px;background:url('${esc(contenuti.foto[0])}') center/cover"></div></section>`
+        : `<div style="flex:1;min-width:260px;background:${palette.accento};border-radius:16px;min-height:280px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.1rem">La tua foto qui</div></section>`}`;
   }
   return `<section style="text-align:center;padding:4rem 1.5rem;background:${palette.sfondo}">
     <h1 style="font-size:2.8rem;margin:0 0 1rem">${titolo}</h1><p style="font-size:1.25rem">${tagline}</p></section>`;
@@ -305,6 +331,7 @@ function renderSito({ sito, template, contenuti }) {
 </header>
 ${hero(contenuti, palette, template.layout)}
 ${sezioniCategoria(contenuti, palette, template.categoria)}
+${Array.isArray(contenuti.foto) && contenuti.foto.length ? `<section style="max-width:1100px;margin:0 auto;padding:0 1.5rem 3rem"><h2>Le nostre foto</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem">${contenuti.foto.map((f) => `<img src="${esc(f)}" alt="" loading="lazy" style="width:100%;height:220px;object-fit:cover;border-radius:12px">`).join('')}</div></section>` : ''}
 <footer style="background:${palette.secondaria};color:#fff;padding:2rem 1.5rem;text-align:center">
   <p style="margin:.25rem">${esc(contenuti.indirizzo)} · ${esc(contenuti.email)}</p>
   <p style="margin:.25rem;opacity:.7;font-size:.85rem">Sito creato con Sitevaro · Template ${esc(template.nome)}</p>
@@ -707,6 +734,7 @@ function serializzaSito(sito) {
     template_id: sito.template_id,
     template_nome: sito.template_nome,
     categoria: sito.categoria,
+    lavorazione: sito.lavorazione || 'in-attesa-materiali',
     url: `/s/${sito.slug}`,
     contenuti: JSON.parse(sito.contenuti_json || '{}'),
     created_at: sito.created_at,
@@ -734,6 +762,62 @@ sitiApi.put('/:id/contenuti', richiedeAuth, (req, res) => {
   const aggiornati = { ...attuali, ...nuovi };
   db.prepare('UPDATE siti SET contenuti_json = ? WHERE id = ?').run(JSON.stringify(aggiornati), sito.id);
   res.json({ sito: serializzaSito(sitoConTemplate(sito.id)) });
+});
+
+// POST /api/sites/:id/materiali — il cliente invia testi, foto e logo.
+// I campi di testo compilano subito i contenuti del sito; menu/listino e
+// note restano nei materiali a disposizione di chi costruisce il sito.
+// Foto: [{ nome, tipo, dati (base64, anche con prefisso data:) }]; logo analogo.
+sitiApi.post('/:id/materiali', richiedeAuth, (req, res) => {
+  const sito = db.prepare('SELECT * FROM siti WHERE id = ?').get(req.params.id);
+  if (!sito) return res.status(404).json({ errore: 'Sito non trovato' });
+  if (sito.utente_id !== req.utente.id) return res.status(403).json({ errore: 'Non sei il proprietario di questo sito' });
+
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const campiTesto = {};
+  for (const k of ['nome_attivita', 'tagline', 'descrizione', 'telefono', 'email', 'indirizzo', 'orari', 'ruolo', 'bio']) {
+    if (typeof body[k] === 'string' && body[k].trim()) campiTesto[k] = body[k].trim().slice(0, 2000);
+  }
+
+  const salvaImmagine = (img, prefisso) => {
+    if (!img || typeof img.dati !== 'string') return null;
+    const base64 = img.dati.includes(',') ? img.dati.split(',').pop() : img.dati;
+    let buf;
+    try { buf = Buffer.from(base64, 'base64'); } catch (e) { return null; }
+    if (buf.length < 1024 || buf.length > 8 * 1024 * 1024) return null;
+    const tipo = (img.tipo || '').toLowerCase();
+    const est = tipo.includes('png') ? 'png' : tipo.includes('webp') ? 'webp' : 'jpg';
+    const nomeFile = `${prefisso}-${sito.id}-${crypto.randomBytes(8).toString('hex')}.${est}`;
+    fs.writeFileSync(path.join(UPLOAD_DIR, nomeFile), buf);
+    return `/uploads/${nomeFile}`;
+  };
+
+  const foto = [];
+  if (Array.isArray(body.foto)) {
+    for (const img of body.foto.slice(0, 8)) {
+      const url = salvaImmagine(img, 'foto');
+      if (url) foto.push(url);
+    }
+  }
+  const logo = salvaImmagine(body.logo, 'logo');
+
+  const attuali = JSON.parse(sito.contenuti_json || '{}');
+  const aggiornati = { ...attuali, ...campiTesto };
+  if (foto.length) aggiornati.foto = [...(Array.isArray(attuali.foto) ? attuali.foto : []), ...foto].slice(0, 12);
+  if (logo) aggiornati.logo = logo;
+  db.prepare('UPDATE siti SET contenuti_json = ?, lavorazione = ? WHERE id = ?')
+    .run(JSON.stringify(aggiornati), 'materiali-ricevuti', sito.id);
+
+  db.prepare('INSERT INTO materiali (sito_id, utente_id, dati_json) VALUES (?, ?, ?)')
+    .run(sito.id, req.utente.id, JSON.stringify({
+      campi: campiTesto,
+      elenco_testo: typeof body.elenco_testo === 'string' ? body.elenco_testo.slice(0, 20000) : '',
+      note: typeof body.note === 'string' ? body.note.slice(0, 5000) : '',
+      foto,
+      logo,
+    }));
+
+  res.json({ ok: true, foto, lavorazione: 'materiali-ricevuti', sito: serializzaSito(sitoConTemplate(sito.id)) });
 });
 
 // GET /s/:slug — sito pubblico del cliente
@@ -769,6 +853,47 @@ adminRoutes.get('/panoramica', richiedeAuth, richiedeAdmin, (req, res) => {
   });
 });
 
+// GET /api/admin/ordini — siti con cliente, template, lavorazione e materiali
+adminRoutes.get('/ordini', richiedeAuth, richiedeAdmin, (req, res) => {
+  const rows = db.prepare(`
+    SELECT s.*, t.categoria, t.nome AS template_nome, u.email AS email_cliente
+    FROM siti s
+    JOIN template t ON t.id = s.template_id
+    JOIN utenti u ON u.id = s.utente_id
+    ORDER BY s.created_at DESC
+  `).all();
+  const ordini = rows.map((s) => {
+    const m = db.prepare('SELECT dati_json, created_at FROM materiali WHERE sito_id = ? ORDER BY id DESC LIMIT 1').get(s.id);
+    return {
+      ...serializzaSito(s),
+      email_cliente: s.email_cliente,
+      materiali: m ? { ...JSON.parse(m.dati_json || '{}'), inviati_il: m.created_at } : null,
+    };
+  });
+  res.json({ ordini });
+});
+
+// PATCH /api/admin/siti/:id/lavorazione { stato } — avanza il lavoro sul sito
+adminRoutes.patch('/siti/:id/lavorazione', richiedeAuth, richiedeAdmin, (req, res) => {
+  const stati = ['in-attesa-materiali', 'materiali-ricevuti', 'in-lavorazione', 'pubblicato'];
+  const stato = req.body && req.body.stato;
+  if (!stati.includes(stato)) return res.status(400).json({ errore: 'Stato non valido' });
+  const info = db.prepare('UPDATE siti SET lavorazione = ? WHERE id = ?').run(stato, req.params.id);
+  if (!info.changes) return res.status(404).json({ errore: 'Sito non trovato' });
+  res.json({ ok: true, lavorazione: stato });
+});
+
+// PUT /api/admin/siti/:id/contenuti — l'operatore compila i contenuti veri
+adminRoutes.put('/siti/:id/contenuti', richiedeAuth, richiedeAdmin, (req, res) => {
+  const sito = db.prepare('SELECT * FROM siti WHERE id = ?').get(req.params.id);
+  if (!sito) return res.status(404).json({ errore: 'Sito non trovato' });
+  const nuovi = req.body && typeof req.body === 'object' ? req.body : {};
+  const attuali = JSON.parse(sito.contenuti_json || '{}');
+  db.prepare('UPDATE siti SET contenuti_json = ? WHERE id = ?')
+    .run(JSON.stringify({ ...attuali, ...nuovi }), sito.id);
+  res.json({ sito: serializzaSito(sitoConTemplate(sito.id)) });
+});
+
 /* ==========================================================================
  * 9. AVVIO — seed automatico, app Express, ascolto (come src/index.js)
  * ========================================================================== */
@@ -783,6 +908,16 @@ try {
   console.error('Seed automatico fallito:', e.message);
 }
 
+// Promozione amministratore: se ADMIN_EMAIL è impostata e l'utente esiste,
+// diventa admin (serve all'operatore Sitevaro per vedere gli ordini).
+if (process.env.ADMIN_EMAIL) {
+  try {
+    const info = db.prepare('UPDATE utenti SET is_admin = 1 WHERE lower(email) = lower(?)')
+      .run(process.env.ADMIN_EMAIL.trim());
+    if (info.changes) console.log(`Admin Sitevaro attivo per ${process.env.ADMIN_EMAIL}`);
+  } catch (e) { console.error('Promozione admin fallita:', e.message); }
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -793,7 +928,13 @@ app.use(morgan('dev'));
 // Webhook Stripe PRIMA del parser JSON (serve il corpo raw per la firma)
 app.use('/api/webhooks/stripe', webhookRoutes);
 
+// I materiali dei clienti includono foto in base64: per le sole rotte
+// /api/sites alziamo il limite del corpo a 30 MB (prima del parser globale).
+app.use('/api/sites', express.json({ limit: '30mb' }));
 app.use(express.json({ limit: '1mb' }));
+
+// Foto e loghi caricati dai clienti
+app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d' }));
 
 app.get('/api/salute', (req, res) => res.json({ ok: true, servizio: 'sitevaro-backend' }));
 

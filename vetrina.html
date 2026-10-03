@@ -1827,5 +1827,317 @@
 
     }());
   </script>
+<!-- svm-inizio -->
+<style id="svm-style">
+#svm-root{max-width:1100px;margin:2rem auto;padding:0 1.5rem;font-family:inherit}
+#svm-root .svm-title{font-size:1.6rem;margin:0 0 .25rem}
+#svm-root .svm-sub{color:#5b655c;font-size:.95rem;margin:.25rem 0 .75rem}
+#svm-root .svm-admin{margin-bottom:2.5rem}
+#svm-root .svm-admin h3{font-size:1.4rem}
+#svm-root .svm-card{background:#fff;border:1px solid #e4ddca;border-radius:16px;padding:1.25rem 1.5rem;margin:1rem 0;box-shadow:0 2px 10px rgba(20,35,26,.05)}
+#svm-root .svm-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
+#svm-root .svm-chip{background:#f3e7d3;color:#8a5a12;border-radius:999px;padding:.3rem .8rem;font-size:.85rem;font-weight:600;white-space:nowrap}
+#svm-root .svm-chip-on{background:#dcefe0;color:#14632e}
+#svm-root .svm-form{display:grid;gap:.8rem;margin-top:.5rem}
+#svm-root label{display:grid;gap:.3rem;font-weight:600;font-size:.92rem}
+#svm-root input[type=text],#svm-root input:not([type]),#svm-root textarea,#svm-root select{font:inherit;font-weight:400;padding:.6rem .8rem;border:1px solid #cfc8b2;border-radius:10px;background:#fbf9f3;width:100%;box-sizing:border-box}
+#svm-root input[type=file]{font:inherit;font-weight:400}
+#svm-root .svm-2col{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
+@media(max-width:640px){#svm-root .svm-2col{grid-template-columns:1fr}}
+#svm-root .svm-btn{background:#16241c;color:#fff;border:0;border-radius:999px;padding:.8rem 1.6rem;font:inherit;font-weight:700;cursor:pointer;justify-self:start}
+#svm-root .svm-btn:disabled{opacity:.55;cursor:wait}
+#svm-root .svm-msg{border-radius:10px;padding:.7rem 1rem;margin:0}
+#svm-root .svm-msg-ok{background:#e3f3e6;color:#14532d}
+#svm-root .svm-msg-ko{background:#fbe7e1;color:#8c2b12}
+#svm-root .svm-foto-ok{display:flex;gap:.5rem;flex-wrap:wrap}
+#svm-root .svm-foto-ok img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid #e4ddca}
+#svm-root .svm-mat{display:grid;gap:.4rem;background:#fbf9f3;border:1px solid #eee6cf;border-radius:12px;padding:.8rem 1rem;margin:.6rem 0}
+#svm-root .svm-mat pre{white-space:pre-wrap;font:inherit;margin:.2rem 0}
+#svm-root .svm-stato{max-width:340px}
+#svm-root .svm-link{color:#16241c;font-weight:700}
+#svm-root .svm-row{display:flex;gap:.6rem;flex-wrap:wrap}
+
+</style>
+<script>
+/* Sitevaro — modulo materiali cliente + pannello ordini operatore.
+   Blocco autonomo: legge il token da localStorage (sitevaro_token),
+   parla con le API del backend e si inserisce dopo l'Area cliente. */
+(function () {
+  'use strict';
+
+  var API = 'https://sitevaro-backend-6qm3.onrender.com';
+  if (location.origin && location.origin.indexOf('onrender.com') !== -1) API = location.origin;
+
+  var STATI = {
+    'in-attesa-materiali': 'In attesa dei tuoi materiali',
+    'materiali-ricevuti': 'Materiali ricevuti — stiamo costruendo il tuo sito',
+    'in-lavorazione': 'Stiamo costruendo il tuo sito',
+    'pubblicato': 'Online'
+  };
+  var PLACEHOLDER = ['La mia attività', 'Il tuo sito pronto in minuti con Sitevaro',
+    'Benvenuto nel nostro sito! Personalizza questi testi dal tuo pannello.',
+    '+39 000 000 0000', 'info@esempio.it', 'Via Esempio 1, Milano',
+    'Mario Rossi', 'Il mio negozio', 'Freelance Designer',
+    'Creo esperienze digitali memorabili da oltre 5 anni.'];
+  var ELENCO_LABEL = {
+    'ristorante': ['Il tuo menu', 'Un piatto per riga, con il prezzo. Esempio: Carbonara — €12'],
+    'attivita-locale': ['I tuoi servizi', 'Un servizio per riga, con una breve descrizione'],
+    'freelance-portfolio': ['I tuoi progetti', 'Un progetto per riga: titolo e cosa hai fatto'],
+    'e-commerce': ['I tuoi prodotti', 'Un prodotto per riga, con il prezzo. Esempio: Maglietta — €29']
+  };
+
+  var root = document.createElement('div');
+  root.id = 'svm-root';
+  root.hidden = true;
+
+  var rendered = false;
+  var rendering = false;
+
+  function token() {
+    try { return localStorage.getItem('sitevaro_token') || ''; } catch (e) { return ''; }
+  }
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+  function val(x) { return PLACEHOLDER.indexOf(x) !== -1 ? '' : (x || ''); }
+
+  function api(path, opts) {
+    opts = opts || {};
+    opts.headers = opts.headers || {};
+    opts.headers['Authorization'] = 'Bearer ' + token();
+    if (opts.body) opts.headers['Content-Type'] = 'application/json';
+    return fetch(API + path, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok) throw new Error(d.errore || 'Qualcosa è andato storto');
+        return d;
+      });
+    });
+  }
+
+  function comprimi(file) {
+    return new Promise(function (resolve) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () {
+        var max = 1600;
+        var w = img.width, h = img.height;
+        var scala = Math.min(1, max / Math.max(w, h));
+        var c = document.createElement('canvas');
+        c.width = Math.round(w * scala);
+        c.height = Math.round(h * scala);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve({ nome: file.name, tipo: 'image/jpeg', dati: c.toDataURL('image/jpeg', 0.85) });
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        var r = new FileReader();
+        r.onload = function () { resolve({ nome: file.name, tipo: file.type || 'image/jpeg', dati: r.result }); };
+        r.readAsDataURL(file);
+      };
+      img.src = url;
+    });
+  }
+
+  function chip(stato) {
+    var s = STATI[stato] || STATI['in-attesa-materiali'];
+    var online = stato === 'pubblicato';
+    return '<span class="svm-chip' + (online ? ' svm-chip-on' : '') + '">' + esc(s) + '</span>';
+  }
+
+  function moduloSito(sito) {
+    var c = sito.contenuti || {};
+    var el = ELENCO_LABEL[sito.categoria] || ELENCO_LABEL['attivita-locale'];
+    var fotoEsistenti = Array.isArray(c.foto) ? c.foto : [];
+    return '' +
+    '<div class="svm-card" data-sito="' + sito.id + '">' +
+      '<div class="svm-card-head">' +
+        '<div><strong>' + esc(val(c.nome_attivita) || sito.template_nome || 'Il tuo sito') + '</strong>' +
+        '<div class="svm-sub">' + esc(sito.template_nome || '') + '</div></div>' +
+        chip(sito.lavorazione) +
+      '</div>' +
+      (sito.lavorazione === 'pubblicato'
+        ? '<p class="svm-sub">Il tuo sito è online: <a href="' + API + esc(sito.url) + '" target="_blank" rel="noopener">visitalo qui</a>. Da questo modulo puoi inviarci aggiornamenti quando vuoi.</p>'
+        : '<p class="svm-sub">Mandaci testi, foto e listino: costruiamo noi il tuo sito con questo design.</p>') +
+      '<form class="svm-form">' +
+        '<label>Nome della tua attività *<input name="nome_attivita" required value="' + esc(val(c.nome_attivita)) + '" placeholder="Es. Trattoria Da Luigi"></label>' +
+        '<label>Frase di copertina<input name="tagline" value="' + esc(val(c.tagline)) + '" placeholder="Es. Cucina romana dal 1985"></label>' +
+        '<label>Descrivi la tua attività<textarea name="descrizione" rows="3" placeholder="Cosa fate, da quanto tempo, cosa vi rende speciali…">' + esc(val(c.descrizione)) + '</textarea></label>' +
+        '<div class="svm-2col">' +
+          '<label>Telefono<input name="telefono" value="' + esc(val(c.telefono)) + '" placeholder="+39 …"></label>' +
+          '<label>Email<input name="email" value="' + esc(val(c.email)) + '" placeholder="info@…"></label>' +
+        '</div>' +
+        '<div class="svm-2col">' +
+          '<label>Indirizzo<input name="indirizzo" value="' + esc(val(c.indirizzo)) + '" placeholder="Via …, città"></label>' +
+          '<label>Orari<input name="orari" value="' + esc(val(c.orari)) + '" placeholder="Lun–Sab 9:00–19:00"></label>' +
+        '</div>' +
+        '<label>' + esc(el[0]) + '<textarea name="elenco_testo" rows="5" placeholder="' + esc(el[1]) + '"></textarea></label>' +
+        '<label>Le tue foto (il locale, i piatti, il team…)<input type="file" name="foto" accept="image/*" multiple></label>' +
+        (fotoEsistenti.length ? '<div class="svm-foto-ok">' + fotoEsistenti.map(function (f) {
+          return '<img src="' + API + esc(f) + '" alt="">';
+        }).join('') + '</div><p class="svm-sub">Foto già ricevute: ' + fotoEsistenti.length + ' (puoi aggiungerne altre)</p>' : '') +
+        '<label>Il tuo logo, se ce l\u2019hai<input type="file" name="logo" accept="image/*"></label>' +
+        '<label>Note per noi<textarea name="note" rows="2" placeholder="Colori preferiti, siti che ti piacciono, richieste particolari…"></textarea></label>' +
+        '<button type="submit" class="svm-btn">Invia i materiali</button>' +
+        '<p class="svm-msg" hidden></p>' +
+      '</form>' +
+    '</div>';
+  }
+
+  function collegaForm() {
+    Array.prototype.forEach.call(root.querySelectorAll('.svm-form'), function (form) {
+      form.addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        var card = form.closest('.svm-card');
+        var id = card.getAttribute('data-sito');
+        var btn = form.querySelector('.svm-btn');
+        var msg = form.querySelector('.svm-msg');
+        btn.disabled = true;
+        btn.textContent = 'Invio in corso…';
+        msg.hidden = true;
+
+        var dati = {};
+        ['nome_attivita', 'tagline', 'descrizione', 'telefono', 'email', 'indirizzo', 'orari']
+          .forEach(function (k) { dati[k] = form.elements[k].value.trim(); });
+        dati.elenco_testo = form.elements.elenco_testo.value;
+        dati.note = form.elements.note.value;
+
+        var fotoFiles = Array.prototype.slice.call(form.elements.foto.files || []).slice(0, 8);
+        var logoFile = (form.elements.logo.files || [])[0];
+
+        Promise.all(fotoFiles.map(comprimi)).then(function (foto) {
+          dati.foto = foto;
+          return logoFile ? comprimi(logoFile) : null;
+        }).then(function (logo) {
+          if (logo) dati.logo = logo;
+          return api('/api/sites/' + id + '/materiali', { method: 'POST', body: JSON.stringify(dati) });
+        }).then(function () {
+          msg.hidden = false;
+          msg.className = 'svm-msg svm-msg-ok';
+          msg.textContent = 'Materiali inviati! Ora costruiamo il tuo sito: ti avvisiamo appena è pronto.';
+          var chipEl = card.querySelector('.svm-chip');
+          if (chipEl) { chipEl.textContent = STATI['materiali-ricevuti']; chipEl.classList.remove('svm-chip-on'); }
+          btn.disabled = false;
+          btn.textContent = 'Invia altri materiali';
+        }).catch(function (e) {
+          msg.hidden = false;
+          msg.className = 'svm-msg svm-msg-ko';
+          msg.textContent = e.message || 'Invio non riuscito, riprova.';
+          btn.disabled = false;
+          btn.textContent = 'Invia i materiali';
+        });
+      });
+    });
+  }
+
+  function pannelloAdmin(ordini) {
+    if (!ordini.length) return '<div class="svm-admin"><h3>Pannello Sitevaro — Ordini</h3><p class="svm-sub">Nessun ordine per ora.</p></div>';
+    var cards = ordini.map(function (o) {
+      var m = o.materiali;
+      var campi = m && m.campi ? Object.keys(m.campi).map(function (k) {
+        return '<div><strong>' + esc(k) + ':</strong> ' + esc(m.campi[k]) + '</div>';
+      }).join('') : '';
+      var foto = m && m.foto && m.foto.length
+        ? '<div class="svm-foto-ok">' + m.foto.map(function (f) {
+            return '<a href="' + API + esc(f) + '" target="_blank" rel="noopener"><img src="' + API + esc(f) + '" alt=""></a>';
+          }).join('') + '</div>' : '';
+      var stati = Object.keys(STATI).map(function (s) {
+        return '<option value="' + s + '"' + (o.lavorazione === s ? ' selected' : '') + '>' + STATI[s] + '</option>';
+      }).join('');
+      return '<div class="svm-card svm-ordine" data-sito="' + o.id + '">' +
+        '<div class="svm-card-head"><div><strong>' + esc(o.email_cliente) + '</strong>' +
+        '<div class="svm-sub">' + esc(o.template_nome) + ' · ' + esc((o.created_at || '').slice(0, 10)) + '</div></div>' +
+        '<a class="svm-link" href="' + API + esc(o.url) + '" target="_blank" rel="noopener">Vedi sito</a></div>' +
+        (m ? '<div class="svm-mat"><div class="svm-sub">Materiali del ' + esc((m.inviati_il || '').slice(0, 10)) + '</div>' +
+          campi +
+          (m.elenco_testo ? '<div><strong>Elenco:</strong><pre>' + esc(m.elenco_testo) + '</pre></div>' : '') +
+          (m.note ? '<div><strong>Note:</strong> ' + esc(m.note) + '</div>' : '') + foto + '</div>'
+          : '<p class="svm-sub">Materiali non ancora inviati.</p>') +
+        '<label class="svm-stato">Stato di lavorazione <select class="svm-stato-sel">' + stati + '</select></label>' +
+        '<label>Contenuti del sito (JSON)<textarea class="svm-contenuti" rows="8">' +
+          esc(JSON.stringify(o.contenuti || {}, null, 2)) + '</textarea></label>' +
+        '<div class="svm-row"><button class="svm-btn svm-salva-stato" type="button">Salva stato</button>' +
+        '<button class="svm-btn svm-salva-contenuti" type="button">Salva contenuti</button></div>' +
+        '<p class="svm-msg" hidden></p>' +
+      '</div>';
+    }).join('');
+    return '<div class="svm-admin"><h3>Pannello Sitevaro — Ordini</h3>' + cards + '</div>';
+  }
+
+  function collegaAdmin() {
+    Array.prototype.forEach.call(root.querySelectorAll('.svm-ordine'), function (card) {
+      var id = card.getAttribute('data-sito');
+      var msg = card.querySelector('.svm-msg');
+      function esito(ok, testo) {
+        msg.hidden = false;
+        msg.className = 'svm-msg ' + (ok ? 'svm-msg-ok' : 'svm-msg-ko');
+        msg.textContent = testo;
+      }
+      card.querySelector('.svm-salva-stato').addEventListener('click', function () {
+        api('/api/admin/siti/' + id + '/lavorazione', {
+          method: 'PATCH',
+          body: JSON.stringify({ stato: card.querySelector('.svm-stato-sel').value })
+        }).then(function () { esito(true, 'Stato aggiornato.'); })
+          .catch(function (e) { esito(false, e.message); });
+      });
+      card.querySelector('.svm-salva-contenuti').addEventListener('click', function () {
+        var obj;
+        try { obj = JSON.parse(card.querySelector('.svm-contenuti').value); }
+        catch (e) { esito(false, 'JSON non valido: controlla virgole e parentesi.'); return; }
+        api('/api/admin/siti/' + id + '/contenuti', { method: 'PUT', body: JSON.stringify(obj) })
+          .then(function () { esito(true, 'Contenuti salvati: il sito è aggiornato.'); })
+          .catch(function (e) { esito(false, e.message); });
+      });
+    });
+  }
+
+  function render() {
+    rendering = true;
+    api('/api/auth/me').then(function (me) {
+      return api('/api/sites/miei').then(function (d) { return { me: me, siti: d.siti || [] }; });
+    }).then(function (r) {
+      var html = '';
+      if (r.me.utente && r.me.utente.is_admin) html += '<div id="svm-admin-slot"></div>';
+      if (r.siti.length) {
+        html += '<h3 class="svm-title">Completa il tuo sito</h3>' +
+          '<p class="svm-sub">Per ogni sito che hai scelto, mandaci i tuoi materiali: pensiamo noi a costruirlo e pubblicarlo.</p>' +
+          r.siti.map(moduloSito).join('');
+      }
+      root.innerHTML = html;
+      root.hidden = !html;
+      rendered = true;
+      rendering = false;
+      collegaForm();
+      if (r.me.utente && r.me.utente.is_admin) {
+        api('/api/admin/ordini').then(function (d) {
+          var slot = document.getElementById('svm-admin-slot');
+          if (slot) { slot.innerHTML = pannelloAdmin(d.ordini || []); collegaAdmin(); }
+        }).catch(function () {});
+      }
+    }).catch(function () {
+      rendering = false;
+    });
+  }
+
+  function init() {
+    var area = document.getElementById('area-cliente');
+    if (area && area.parentNode) area.parentNode.insertBefore(root, area.nextSibling);
+    else document.body.appendChild(root);
+    window.setInterval(function () {
+      var t = token();
+      if (t && !rendered && !rendering) render();
+      if (!t && rendered) { root.innerHTML = ''; root.hidden = true; rendered = false; }
+    }, 1500);
+    if (token()) render();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+
+</script>
+<!-- svm-fine -->
 </body>
 </html>
