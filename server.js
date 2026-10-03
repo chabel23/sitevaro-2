@@ -211,6 +211,45 @@ const NOMI_VETRINA = {
   'e-commerce': ['Shop', 'Store', 'Boutique', 'Market', 'Emporio', 'Outlet', 'Galleria', 'Bazar'],
 };
 
+// Foto di esempio per categoria (Unsplash, verificate il 2026-10-03).
+// Ogni template ne riceve una come immagine principale più tre di galleria,
+// scelte a rotazione: così le anteprime mostrano un sito vero, con foto,
+// e non solo colori. Quando il cliente invia le sue foto, le sostituiscono.
+const FOTO_CATEGORIA = {
+  'ristorante': [
+    '1517248135467-4c7edcad34c4', '1414235077428-338989a2e8c0', '1552566626-52f8b828add9',
+    '1555396273-367ea4eb4db5', '1565299624946-b28f40a0ae38', '1504674900247-0877df9cc836',
+  ],
+  'attivita-locale': [
+    '1503951914875-452162b0f3f1', '1560066984-138dadb4c035', '1441986300917-64674bd600d8',
+    '1556742049-0cfed4f6a45d', '1600880292203-757bb62b4baf',
+  ],
+  'freelance-portfolio': [
+    '1499951360447-b19be8fe80f5', '1461749280684-dccba630e2f6', '1522542550221-31fd19575a2d',
+    '1486312338219-ce68d2c6f44d', '1516035069371-29a1b244cc32', '1493863641943-9b68992a8d07',
+  ],
+  'e-commerce': [
+    '1472851294608-062f824d29cc', '1445205170230-053b83016050', '1523275335684-37898b6baf30',
+    '1505740420928-5e560c06d30e', '1560343090-f0409e92791a', '1542291026-7eec264c27ff',
+  ],
+};
+
+function urlFoto(idFoto, larghezza) {
+  return `https://images.unsplash.com/photo-${idFoto}?q=80&w=${larghezza || 1200}&auto=format&fit=crop`;
+}
+
+// Foto abbinate a un template: deterministiche (stesso template, stesse foto).
+function fotoTemplate(categoria, templateId) {
+  const pool = FOTO_CATEGORIA[categoria] || FOTO_CATEGORIA['attivita-locale'];
+  const m = String(templateId || '').match(/(\d+)\s*$/);
+  const n = m ? parseInt(m[1], 10) : 0;
+  const i = ((n % pool.length) + pool.length) % pool.length;
+  return {
+    hero: urlFoto(pool[i]),
+    galleria: [0, 1, 2].map((k) => urlFoto(pool[(i + 1 + k) % pool.length], 800)),
+  };
+}
+
 /* ==========================================================================
  * 3. SEED TEMPLATE (equivalente di src/lib/seedTemplates.js)
  *    Seed parametrico IDEMPOTENTE: 150 template per categoria × 4 = 600.
@@ -279,60 +318,66 @@ function stilePulsante(palette) {
   return `display:inline-block;background:${palette.primaria};color:#fff;padding:0.8rem 1.6rem;border-radius:${radius};text-decoration:none;font-weight:600`;
 }
 
-function hero(contenuti, palette, layout) {
+function hero(contenuti, palette, layout, fotoHero) {
   const titolo = esc(contenuti.nome_attivita);
   const tagline = esc(contenuti.tagline);
   if (layout.includes('fullscreen')) {
-    return `<section style="min-height:70vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;background:linear-gradient(135deg,${palette.primaria},${palette.secondaria});color:#fff;padding:4rem 1.5rem">
+    return `<section id="home" style="min-height:70vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;background:linear-gradient(rgba(10,15,12,.45),rgba(10,15,12,.6)),url('${esc(fotoHero)}') center/cover,linear-gradient(135deg,${palette.primaria},${palette.secondaria});color:#fff;padding:4rem 1.5rem">
       <h1 style="font-size:3rem;margin:0 0 1rem">${titolo}</h1><p style="font-size:1.3rem;opacity:.9">${tagline}</p></section>`;
   }
   if (layout.includes('split') || layout.includes('personale')) {
-    return `<section style="display:flex;flex-wrap:wrap;align-items:center;gap:2rem;padding:4rem 1.5rem;max-width:1100px;margin:0 auto">
+    return `<section id="home" style="display:flex;flex-wrap:wrap;align-items:center;gap:2rem;padding:4rem 1.5rem;max-width:1100px;margin:0 auto">
       <div style="flex:1;min-width:260px"><h1 style="font-size:2.6rem;margin:0 0 1rem">${titolo}</h1>
       <p style="font-size:1.2rem;color:${palette.secondaria}">${tagline}</p>
       <p>${esc(contenuti.descrizione)}</p></div>
-      ${Array.isArray(contenuti.foto) && contenuti.foto[0]
-        ? `<div style="flex:1;min-width:260px;border-radius:16px;min-height:280px;background:url('${esc(contenuti.foto[0])}') center/cover"></div></section>`
-        : `<div style="flex:1;min-width:260px;background:${palette.accento};border-radius:16px;min-height:280px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.1rem">La tua foto qui</div></section>`}`;
+      <div style="flex:1;min-width:260px;border-radius:16px;min-height:280px;background:url('${esc(fotoHero)}') center/cover"></div></section>`;
   }
-  return `<section style="text-align:center;padding:4rem 1.5rem;background:${palette.sfondo}">
-    <h1 style="font-size:2.8rem;margin:0 0 1rem">${titolo}</h1><p style="font-size:1.25rem">${tagline}</p></section>`;
+  return `<section id="home" style="text-align:center;padding:4rem 1.5rem 2rem;background:${palette.sfondo}">
+    <h1 style="font-size:2.8rem;margin:0 0 1rem">${titolo}</h1><p style="font-size:1.25rem">${tagline}</p>
+    <img src="${esc(fotoHero)}" alt="" style="width:min(900px,100%);height:340px;object-fit:cover;border-radius:16px;margin-top:2rem"></section>`;
 }
 
-function sezioniCategoria(contenuti, palette, categoria) {
-  const card = (titolo, corpo, extra = '') =>
-    `<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,.05)">
-      <h3 style="margin-top:0;color:${palette.primaria}">${esc(titolo)}</h3><p>${esc(corpo)}</p>${extra}</div>`;
+function sezioniCategoria(contenuti, palette, categoria, foto) {
+  const immagini = Array.isArray(foto) && foto.length ? foto : [];
+  const card = (titolo, corpo, extra = '', indice = 0) =>
+    `<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.05)">
+      ${immagini.length ? `<img src="${esc(immagini[indice % immagini.length])}" alt="" loading="lazy" style="width:100%;height:150px;object-fit:cover;display:block">` : ''}
+      <div style="padding:1.25rem 1.5rem 1.5rem"><h3 style="margin-top:0;color:${palette.primaria}">${esc(titolo)}</h3><p>${esc(corpo)}</p>${extra}</div></div>`;
   const griglia = (items) =>
     `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem">${items}</div>`;
 
   if (categoria === 'ristorante' && contenuti.piatti) {
-    return `<section style="max-width:1100px;margin:0 auto;padding:2rem 1.5rem"><h2>Il nostro menu</h2>${griglia(contenuti.piatti.map((p) =>
-      card(p.nome, p.descrizione, `<strong>${esc(p.prezzo)}</strong>`)).join(''))}</section>
+    return `<section id="servizi" style="max-width:1100px;margin:0 auto;padding:2rem 1.5rem"><h2>Il nostro menu</h2>${griglia(contenuti.piatti.map((p, i) =>
+      card(p.nome, p.descrizione, `<strong>${esc(p.prezzo)}</strong>`, i)).join(''))}</section>
       <section style="max-width:1100px;margin:0 auto;padding:1rem 1.5rem 3rem"><p><strong>Orari:</strong> ${esc(contenuti.orari)}</p></section>`;
   }
   if (categoria === 'attivita-locale' && contenuti.servizi) {
-    return `<section style="max-width:1100px;margin:0 auto;padding:2rem 1.5rem"><h2>I nostri servizi</h2>${griglia(contenuti.servizi.map((s) =>
-      card(s.nome, s.descrizione)).join(''))}</section>
+    return `<section id="servizi" style="max-width:1100px;margin:0 auto;padding:2rem 1.5rem"><h2>I nostri servizi</h2>${griglia(contenuti.servizi.map((s, i) =>
+      card(s.nome, s.descrizione, '', i)).join(''))}</section>
       <section style="max-width:1100px;margin:0 auto;padding:1rem 1.5rem 3rem"><p><strong>Orari:</strong> ${esc(contenuti.orari)}</p></section>`;
   }
   if (categoria === 'freelance-portfolio' && contenuti.progetti) {
-    return `<section style="max-width:1100px;margin:0 auto;padding:2rem 1.5rem"><h2 style="color:${palette.secondaria}">${esc(contenuti.ruolo)}</h2>
-      <p>${esc(contenuti.bio)}</p><h2>Progetti</h2>${griglia(contenuti.progetti.map((p) =>
-      card(p.titolo, p.descrizione)).join(''))}</section>`;
+    return `<section id="servizi" style="max-width:1100px;margin:0 auto;padding:2rem 1.5rem"><h2 style="color:${palette.secondaria}">${esc(contenuti.ruolo)}</h2>
+      <p>${esc(contenuti.bio)}</p><h2>Progetti</h2>${griglia(contenuti.progetti.map((p, i) =>
+      card(p.titolo, p.descrizione, '', i)).join(''))}</section>`;
   }
   if (categoria === 'e-commerce' && contenuti.prodotti) {
-    return `<section style="max-width:1100px;margin:0 auto;padding:2rem 1.5rem"><h2>I nostri prodotti</h2>${griglia(contenuti.prodotti.map((p) =>
+    return `<section id="servizi" style="max-width:1100px;margin:0 auto;padding:2rem 1.5rem"><h2>I nostri prodotti</h2>${griglia(contenuti.prodotti.map((p, i) =>
       card(p.nome, p.descrizione, `<div style="margin-top:.5rem"><strong>${esc(p.prezzo)}</strong>
-      <a href="mailto:${esc(contenuti.email)}?subject=Ordine: ${esc(p.nome)}" style="${stilePulsante(palette)};margin-left:.75rem;padding:.5rem 1rem">Ordina</a></div>`)).join(''))}</section>`;
+      <a href="mailto:${esc(contenuti.email)}?subject=Ordine: ${esc(p.nome)}" style="${stilePulsante(palette)};margin-left:.75rem;padding:.5rem 1rem">Ordina</a></div>`, i)).join(''))}</section>`;
   }
-  return `<section style="max-width:1100px;margin:0 auto;padding:2rem 1.5rem"><p>${esc(contenuti.descrizione)}</p></section>`;
+  return '';
 }
 
 function renderSito({ sito, template, contenuti }) {
   const palette = JSON.parse(template.palette);
   const font = template.font;
   const titolo = esc(contenuti.nome_attivita || template.nome);
+  const fotoTpl = fotoTemplate(template.categoria, template.id);
+  const fotoSito = Array.isArray(contenuti.foto) && contenuti.foto.length
+    ? contenuti.foto
+    : [fotoTpl.hero, ...fotoTpl.galleria];
+  const etichettaSezione = { 'ristorante': 'Menu', 'attivita-locale': 'Servizi', 'freelance-portfolio': 'Progetti', 'e-commerce': 'Prodotti' }[template.categoria] || 'Servizi';
 
   return `<!doctype html>
 <html lang="it">
@@ -344,13 +389,23 @@ function renderSito({ sito, template, contenuti }) {
 <style>body{font-family:'${font}',system-ui,sans-serif;margin:0;background:${palette.sfondo};color:${palette.testo}}h1,h2,h3{font-family:'${font}',serif}</style>
 </head>
 <body>
-<header style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1.5rem;background:${palette.secondaria};color:#fff">
+<header style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;padding:1rem 1.5rem;background:${palette.secondaria};color:#fff">
   <strong style="font-size:1.2rem">${titolo}</strong>
+  <nav style="display:flex;gap:1.25rem;flex-wrap:wrap;font-size:.95rem">
+    <a href="#home" style="color:#fff;text-decoration:none">Home</a>
+    <a href="#servizi" style="color:#fff;text-decoration:none">${etichettaSezione}</a>
+    <a href="#foto" style="color:#fff;text-decoration:none">Foto</a>
+    <a href="#contatti" style="color:#fff;text-decoration:none">Contatti</a>
+  </nav>
   <a href="tel:${esc(contenuti.telefono)}" style="color:#fff;text-decoration:none">${esc(contenuti.telefono)}</a>
 </header>
-${hero(contenuti, palette, template.layout)}
-${sezioniCategoria(contenuti, palette, template.categoria)}
-${Array.isArray(contenuti.foto) && contenuti.foto.length ? `<section style="max-width:1100px;margin:0 auto;padding:0 1.5rem 3rem"><h2>Le nostre foto</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem">${contenuti.foto.map((f) => `<img src="${esc(f)}" alt="" loading="lazy" style="width:100%;height:220px;object-fit:cover;border-radius:12px">`).join('')}</div></section>` : ''}
+${hero(contenuti, palette, template.layout, fotoSito[0])}
+<section id="chisiamo" style="max-width:1100px;margin:0 auto;padding:2.5rem 1.5rem 0.5rem"><h2>Chi siamo</h2><p style="font-size:1.05rem;line-height:1.6">${esc(contenuti.descrizione)}</p></section>
+${sezioniCategoria(contenuti, palette, template.categoria, fotoSito)}
+<section id="foto" style="max-width:1100px;margin:0 auto;padding:0 1.5rem 3rem"><h2>Le nostre foto</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem">${fotoSito.map((f) => `<img src="${esc(f)}" alt="" loading="lazy" style="width:100%;height:220px;object-fit:cover;border-radius:12px">`).join('')}</div></section>
+<section id="contatti" style="max-width:1100px;margin:0 auto;padding:0 1.5rem 3.5rem"><h2>Contatti</h2>
+  <p style="line-height:1.7">${esc(contenuti.indirizzo)}<br>Telefono: <a href="tel:${esc(contenuti.telefono)}" style="color:${palette.primaria}">${esc(contenuti.telefono)}</a><br>Email: <a href="mailto:${esc(contenuti.email)}" style="color:${palette.primaria}">${esc(contenuti.email)}</a>${contenuti.orari ? `<br>Orari: ${esc(contenuti.orari)}` : ''}</p>
+  <p><a href="tel:${esc(contenuti.telefono)}" style="${stilePulsante(palette)}">Chiamaci ora</a></p></section>
 <footer style="background:${palette.secondaria};color:#fff;padding:2rem 1.5rem;text-align:center">
   <p style="margin:.25rem">${esc(contenuti.indirizzo)} · ${esc(contenuti.email)}</p>
   <p style="margin:.25rem;opacity:.7;font-size:.85rem">Sito creato con Sitevaro · Template ${esc(template.nome)}</p>
@@ -636,6 +691,7 @@ const templateRoutes = express.Router();
 
 function serializzaTemplate(row) {
   if (!row) return null;
+  const foto = fotoTemplate(row.categoria, row.id);
   return {
     id: row.id,
     categoria: row.categoria,
@@ -644,6 +700,8 @@ function serializzaTemplate(row) {
     palette: JSON.parse(row.palette),
     font: row.font,
     riservato: !!row.riservato,
+    foto: foto.hero,
+    foto_galleria: foto.galleria,
   };
 }
 

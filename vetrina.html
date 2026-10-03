@@ -155,6 +155,21 @@
     .mini-visual::after { content: ""; position: absolute; width: 22px; height: 38px; border-radius: 11px 11px 3px 3px; background: var(--tp1); left: 13px; top: 19px; opacity: .88; }
     .mini-features { height: 43px; padding: 5px 13px 9px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
     .mini-features i { display: block; border-radius: calc(var(--mini-radius, 12px) * .55); background: color-mix(in srgb, var(--tp1) 10%, var(--tp2)); border: 1px solid color-mix(in srgb, var(--tp1) 12%, transparent); }
+    .mini-visual.has-photo { background-size: cover; background-position: center; }
+    .mini-visual.has-photo::before, .mini-visual.has-photo::after { display: none; }
+    .template-shot.is-large { height: auto; }
+    .mini-pagine { display: flex; gap: 6px; padding: 10px 13px 0; flex-wrap: wrap; }
+    .mini-pg-btn { font: 700 10px "DM Sans", sans-serif; padding: 6px 12px; border-radius: 99px; border: 1px solid color-mix(in srgb, var(--tp1) 25%, transparent); background: transparent; color: inherit; cursor: pointer; }
+    .mini-pg-btn.is-on { background: var(--tp1); color: var(--tp2); }
+    .mini-pagina { padding: 12px 16px 18px; }
+    .mini-pagina h5 { margin: 0 0 10px; font-size: 13px; }
+    .mini-pagina p { font-size: 12px; line-height: 1.55; }
+    .mini-voce { display: flex; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid color-mix(in srgb, var(--tp1) 10%, transparent); }
+    .mini-voce img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; }
+    .mini-voce b { display: block; font-size: 12px; }
+    .mini-voce small { font-size: 11px; opacity: .75; }
+    .mini-foto-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .mini-foto-grid img { width: 100%; height: 110px; object-fit: cover; border-radius: 10px; display: block; }
     .template-shot.layout-0 .mini-layout { grid-template-columns: 1fr; text-align: center; }
     .template-shot.layout-0 .mini-copy b, .template-shot.layout-0 .mini-copy p { margin-left: auto; margin-right: auto; }
     .template-shot.layout-0 .mini-visual { display: none; }
@@ -1121,15 +1136,46 @@
         var content = contentSet[item.category];
         return content.category + ' · ' + content.prefix + ' ' + item.number;
       }
+      var esempiVetrina = {
+        'Ristorante': { label: 'Menu', voci: [['Carbonara', '€12'], ['Tagliata di manzo', '€22'], ['Antipasto misto', '€9'], ['Tiramisù della casa', '€7']] },
+        'Attività locale': { label: 'Servizi', voci: [['Taglio e stile', 'da €25'], ['Consulenza gratuita', 'Su appuntamento'], ['Trattamento completo', 'da €40'], ['Pacchetto fedeltà', 'Sconti per i clienti abituali']] },
+        'Freelance': { label: 'Progetti', voci: [['Brand per caffetteria', 'Identità visiva e sito'], ['Shop per artigiano', 'E-commerce su misura'], ['Campagna social', 'Foto e contenuti'], ['Restyling studio', 'Sito vetrina']] },
+        'E-commerce': { label: 'Prodotti', voci: [['Maglietta basic', '€29'], ['Sneakers urban', '€89'], ['Zaino in pelle', '€119'], ['Orologio minimal', '€149']] }
+      };
       function templateShot(item, large) {
         var content = contentSet[item.category];
         var colors = palettes[item.palette];
         var ctaText = (ctaLabels[language] && ctaLabels[language][item.category]) || ctaLabels.en[item.category] || 'OK';
         var fontStyle = item._fontCss ? 'font-family:' + item._fontCss + ';' : '';
+        var visual = item._foto
+          ? '<div class="mini-visual has-photo" style="background-image:url(\'' + item._foto + '\')" aria-hidden="true"></div>'
+          : '<div class="mini-visual" aria-hidden="true"></div>';
+        var pagine = '';
+        if (large) {
+          var es = esempiVetrina[item.category] || esempiVetrina['Attività locale'];
+          var galleria = [];
+          if (item._foto) galleria.push(item._foto);
+          (item._galleria || []).forEach(function (g) { galleria.push(g); });
+          var voci = es.voci.map(function (v, i) {
+            var img = galleria.length ? galleria[i % galleria.length] : '';
+            return '<div class="mini-voce">' + (img ? '<img src="' + img + '" alt="" loading="lazy">' : '') + '<span><b>' + v[0] + '</b><small>' + v[1] + '</small></span></div>';
+          }).join('');
+          var fotoGrid = galleria.length
+            ? galleria.map(function (g) { return '<img src="' + g + '" alt="" loading="lazy">'; }).join('')
+            : '<p>Qui andranno le foto della tua attività.</p>';
+          pagine =
+            '<div class="mini-pagine"><button type="button" class="mini-pg-btn is-on" data-pg="0">Home</button>' +
+            '<button type="button" class="mini-pg-btn" data-pg="1">' + es.label + '</button>' +
+            '<button type="button" class="mini-pg-btn" data-pg="2">Foto</button>' +
+            '<button type="button" class="mini-pg-btn" data-pg="3">Contatti</button></div>' +
+            '<div class="mini-pagina" data-pagina="1" hidden><h5>' + es.label + '</h5>' + voci + '</div>' +
+            '<div class="mini-pagina" data-pagina="2" hidden><h5>Le nostre foto</h5><div class="mini-foto-grid">' + fotoGrid + '</div></div>' +
+            '<div class="mini-pagina" data-pagina="3" hidden><h5>Contatti</h5><p>Via Esempio 1, Milano<br>+39 000 000 0000 · info@esempio.it</p><p>Orari: Lun–Sab 9:00–19:00</p><span class="mini-cta">' + ctaText + '</span></div>';
+        }
         return '<div class="template-shot layout-' + item.layout + ' ' + item.fontClass + (large ? ' is-large' : '') + '" style="--tp1:' + colors[0] + ';--tp2:' + colors[1] + ';--tp3:' + colors[2] + ';--tp4:' + colors[3] + ';--mini-radius:' + item.radius + 'px;' + fontStyle + '">' +
           '<div class="mini-nav"><span>' + content.business + '</span><span class="mini-links"><i></i><i></i><i></i></span></div>' +
-          '<div class="mini-layout"><div class="mini-copy"><small>' + content.eyebrow + '</small><b>' + content.title + '</b><p>' + content.body + '</p><span class="mini-cta">' + ctaText + '</span></div><div class="mini-visual" aria-hidden="true"></div></div>' +
-          '<div class="mini-features"><i></i><i></i><i></i></div></div>';
+          '<div class="mini-layout"><div class="mini-copy"><small>' + content.eyebrow + '</small><b>' + content.title + '</b><p>' + content.body + '</p><span class="mini-cta">' + ctaText + '</span></div>' + visual + '</div>' +
+          '<div class="mini-features"><i></i><i></i><i></i></div>' + pagine + '</div>';
       }
       var templateGrid = document.getElementById('templateGrid');
       var templateCount = document.getElementById('templateCount');
@@ -1190,6 +1236,17 @@
         modalTemplateTitle.textContent = templateName(item);
         modalTemplateMeta.textContent = item.id + ' · ' + gt('layout') + ' ' + (item.layout + 1) + ': ' + layoutNames[item.layout] + ' · ' + gt('palette') + ' ' + (item.palette + 1);
         modalTemplatePreview.innerHTML = templateShot(item, true);
+        modalTemplatePreview.querySelectorAll('.mini-pg-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var pg = btn.getAttribute('data-pg');
+            modalTemplatePreview.querySelectorAll('.mini-pg-btn').forEach(function (b) { b.classList.toggle('is-on', b === btn); });
+            modalTemplatePreview.querySelectorAll('.mini-pagina').forEach(function (p) { p.hidden = p.getAttribute('data-pagina') !== pg; });
+            var home = modalTemplatePreview.querySelector('.mini-layout');
+            var feats = modalTemplatePreview.querySelector('.mini-features');
+            if (home) home.style.display = pg === '0' ? '' : 'none';
+            if (feats) feats.style.display = pg === '0' ? '' : 'none';
+          });
+        });
         templateModal.hidden = false;
         document.body.classList.add('modal-open');
         closeTemplateModal.focus();
@@ -1546,7 +1603,8 @@
           id: String(bt.id), category: italianCat, number: String(bt.id),
           layout: layoutIndexFrom(bt.layout), palette: palIdx, radius: 16, fontClass: fc,
           _backend: true, _tid: bt.id, _nome: bt.nome || ('Template ' + bt.id),
-          _paletteNome: pal.nome || '', _layoutRaw: bt.layout, _fontRaw: bt.font || '', _fontCss: fontCss
+          _paletteNome: pal.nome || '', _layoutRaw: bt.layout, _fontRaw: bt.font || '', _fontCss: fontCss,
+          _foto: bt.foto || '', _galleria: Array.isArray(bt.foto_galleria) ? bt.foto_galleria : []
         };
       }
       function updateFilterCounts() {
