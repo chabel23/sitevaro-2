@@ -250,6 +250,21 @@ function fotoTemplate(categoria, templateId) {
   };
 }
 
+// Abbinamento tipografico (titoli + testo) per categoria, dalle coppie
+// consigliate dalla skill ui-ux-pro-max installata in ~/workspace/skills:
+// ogni template tiene il suo font per i titoli e riceve un font di testo
+// pensato per il suo settore (ristorante elegante, negozio leggibile, ecc.).
+const FONT_TESTO = {
+  'ristorante': 'Karla',
+  'attivita-locale': 'Inter',
+  'freelance-portfolio': 'Archivo',
+  'e-commerce': 'Nunito Sans',
+};
+
+function fontTesto(categoria) {
+  return FONT_TESTO[categoria] || 'Inter';
+}
+
 /* ==========================================================================
  * 3. SEED TEMPLATE (equivalente di src/lib/seedTemplates.js)
  *    Seed parametrico IDEMPOTENTE: 150 template per categoria × 4 = 600.
@@ -318,29 +333,42 @@ function stilePulsante(palette) {
   return `display:inline-block;background:${palette.primaria};color:#fff;padding:0.8rem 1.6rem;border-radius:${radius};text-decoration:none;font-weight:600`;
 }
 
-function hero(contenuti, palette, layout, fotoHero) {
+// Pulsante principale per categoria: in alto nella prima schermata e
+// ripetuto in fondo (schema consigliato: invito subito + invito finale).
+const CTA_SITO = {
+  'ristorante': ['Prenota un tavolo', 'tel'],
+  'attivita-locale': ['Prenota ora', 'tel'],
+  'freelance-portfolio': ['Contattami', 'mail'],
+  'e-commerce': ['Scopri i prodotti', '#servizi'],
+};
+
+function hero(contenuti, palette, layout, fotoHero, categoria) {
   const titolo = esc(contenuti.nome_attivita);
   const tagline = esc(contenuti.tagline);
+  const ctaCfg = CTA_SITO[categoria] || CTA_SITO['attivita-locale'];
+  const ctaHref = ctaCfg[1] === 'tel' ? `tel:${esc(contenuti.telefono)}`
+    : ctaCfg[1] === 'mail' ? `mailto:${esc(contenuti.email)}` : ctaCfg[1];
+  const cta = `<p style="margin:1.75rem 0 0"><a class="sv-btn" href="${ctaHref}" style="${stilePulsante(palette)}">${ctaCfg[0]}</a></p>`;
   if (layout.includes('fullscreen')) {
     return `<section id="home" style="min-height:70vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;background:linear-gradient(rgba(10,15,12,.45),rgba(10,15,12,.6)),url('${esc(fotoHero)}') center/cover,linear-gradient(135deg,${palette.primaria},${palette.secondaria});color:#fff;padding:4rem 1.5rem">
-      <h1 style="font-size:3rem;margin:0 0 1rem">${titolo}</h1><p style="font-size:1.3rem;opacity:.9">${tagline}</p></section>`;
+      <h1 style="font-size:3rem;margin:0 0 1rem">${titolo}</h1><p style="font-size:1.3rem;opacity:.9">${tagline}</p>${cta}</section>`;
   }
   if (layout.includes('split') || layout.includes('personale')) {
     return `<section id="home" style="display:flex;flex-wrap:wrap;align-items:center;gap:2rem;padding:4rem 1.5rem;max-width:1100px;margin:0 auto">
       <div style="flex:1;min-width:260px"><h1 style="font-size:2.6rem;margin:0 0 1rem">${titolo}</h1>
       <p style="font-size:1.2rem;color:${palette.secondaria}">${tagline}</p>
-      <p>${esc(contenuti.descrizione)}</p></div>
+      <p>${esc(contenuti.descrizione)}</p>${cta}</div>
       <div style="flex:1;min-width:260px;border-radius:16px;min-height:280px;background:url('${esc(fotoHero)}') center/cover"></div></section>`;
   }
   return `<section id="home" style="text-align:center;padding:4rem 1.5rem 2rem;background:${palette.sfondo}">
-    <h1 style="font-size:2.8rem;margin:0 0 1rem">${titolo}</h1><p style="font-size:1.25rem">${tagline}</p>
-    <img src="${esc(fotoHero)}" alt="" style="width:min(900px,100%);height:340px;object-fit:cover;border-radius:16px;margin-top:2rem"></section>`;
+    <h1 style="font-size:2.8rem;margin:0 0 1rem">${titolo}</h1><p style="font-size:1.25rem">${tagline}</p>${cta}
+    <img src="${esc(fotoHero)}" alt="${titolo}" style="width:min(900px,100%);height:340px;object-fit:cover;border-radius:16px;margin-top:2rem"></section>`;
 }
 
 function sezioniCategoria(contenuti, palette, categoria, foto) {
   const immagini = Array.isArray(foto) && foto.length ? foto : [];
   const card = (titolo, corpo, extra = '', indice = 0) =>
-    `<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.05)">
+    `<div class="sv-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.05)">
       ${immagini.length ? `<img src="${esc(immagini[indice % immagini.length])}" alt="" loading="lazy" style="width:100%;height:150px;object-fit:cover;display:block">` : ''}
       <div style="padding:1.25rem 1.5rem 1.5rem"><h3 style="margin-top:0;color:${palette.primaria}">${esc(titolo)}</h3><p>${esc(corpo)}</p>${extra}</div></div>`;
   const griglia = (items) =>
@@ -364,7 +392,7 @@ function sezioniCategoria(contenuti, palette, categoria, foto) {
   if (categoria === 'e-commerce' && contenuti.prodotti) {
     return `<section id="servizi" style="max-width:1100px;margin:0 auto;padding:2rem 1.5rem"><h2>I nostri prodotti</h2>${griglia(contenuti.prodotti.map((p, i) =>
       card(p.nome, p.descrizione, `<div style="margin-top:.5rem"><strong>${esc(p.prezzo)}</strong>
-      <a href="mailto:${esc(contenuti.email)}?subject=Ordine: ${esc(p.nome)}" style="${stilePulsante(palette)};margin-left:.75rem;padding:.5rem 1rem">Ordina</a></div>`, i)).join(''))}</section>`;
+      <a class="sv-btn" href="mailto:${esc(contenuti.email)}?subject=Ordine: ${esc(p.nome)}" style="${stilePulsante(palette)};margin-left:.75rem;padding:.5rem 1rem">Ordina</a></div>`, i)).join(''))}</section>`;
   }
   return '';
 }
@@ -385,11 +413,24 @@ function renderSito({ sito, template, contenuti }) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${titolo} — powered by Sitevaro</title>
-<link href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(font)}:wght@400;600;700&display=swap" rel="stylesheet">
-<style>body{font-family:'${font}',system-ui,sans-serif;margin:0;background:${palette.sfondo};color:${palette.testo}}h1,h2,h3{font-family:'${font}',serif}</style>
+<link href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(font)}:wght@400;600;700&family=${encodeURIComponent(fontTesto(template.categoria))}:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+html{scroll-behavior:smooth}
+body{font-family:'${fontTesto(template.categoria)}',system-ui,sans-serif;margin:0;background:${palette.sfondo};color:${palette.testo};line-height:1.6;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:'${font}',serif;line-height:1.12;letter-spacing:-.01em}
+h2{font-size:clamp(1.55rem,3.2vw,2.15rem);margin:0 0 1rem}
+section{scroll-margin-top:84px}
+a{transition:color .2s ease,background-color .2s ease,transform .2s ease,box-shadow .25s ease,filter .2s ease}
+:focus-visible{outline:3px solid ${palette.accento};outline-offset:2px;border-radius:4px}
+.sv-card{transition:transform .25s ease,box-shadow .25s ease}
+.sv-card:hover{transform:translateY(-4px);box-shadow:0 14px 30px rgba(15,25,20,.13)}
+.sv-btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+img{background:#e8e2d2}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}}
+</style>
 </head>
 <body>
-<header style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;padding:1rem 1.5rem;background:${palette.secondaria};color:#fff">
+<header style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;padding:1rem 1.5rem;background:${palette.secondaria};color:#fff;position:sticky;top:0;z-index:20;box-shadow:0 2px 12px rgba(0,0,0,.15)">
   <strong style="font-size:1.2rem">${titolo}</strong>
   <nav style="display:flex;gap:1.25rem;flex-wrap:wrap;font-size:.95rem">
     <a href="#home" style="color:#fff;text-decoration:none">Home</a>
@@ -399,13 +440,16 @@ function renderSito({ sito, template, contenuti }) {
   </nav>
   <a href="tel:${esc(contenuti.telefono)}" style="color:#fff;text-decoration:none">${esc(contenuti.telefono)}</a>
 </header>
-${hero(contenuti, palette, template.layout, fotoSito[0])}
+${hero(contenuti, palette, template.layout, fotoSito[0], template.categoria)}
 <section id="chisiamo" style="max-width:1100px;margin:0 auto;padding:2.5rem 1.5rem 0.5rem"><h2>Chi siamo</h2><p style="font-size:1.05rem;line-height:1.6">${esc(contenuti.descrizione)}</p></section>
 ${sezioniCategoria(contenuti, palette, template.categoria, fotoSito)}
+${Array.isArray(contenuti.recensioni) && contenuti.recensioni.length ? `<section id="recensioni" style="max-width:1100px;margin:0 auto;padding:0 1.5rem 3rem"><h2>Cosa dicono di noi</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem">${contenuti.recensioni.slice(0, 6).map((r) => `<div class="sv-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,.05)"><div style="color:${palette.accento};letter-spacing:.15em" aria-hidden="true">${'★'.repeat(Math.max(1, Math.min(5, r.stelle || 5)))}</div><p style="font-style:italic">“${esc(r.testo)}”</p><strong>${esc(r.nome)}</strong></div>`).join('')}</div></section>` : ''}
 <section id="foto" style="max-width:1100px;margin:0 auto;padding:0 1.5rem 3rem"><h2>Le nostre foto</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem">${fotoSito.map((f) => `<img src="${esc(f)}" alt="" loading="lazy" style="width:100%;height:220px;object-fit:cover;border-radius:12px">`).join('')}</div></section>
+${Array.isArray(contenuti.faq) && contenuti.faq.length ? `<section id="faq" style="max-width:1100px;margin:0 auto;padding:0 1.5rem 3rem"><h2>Domande frequenti</h2>${contenuti.faq.slice(0, 8).map((f) => `<details style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:1rem 1.25rem;margin-bottom:.75rem"><summary style="font-weight:600;cursor:pointer;padding:.25rem 0">${esc(f.domanda || f.d || '')}</summary><p>${esc(f.risposta || f.r || '')}</p></details>`).join('')}</section>` : ''}
 <section id="contatti" style="max-width:1100px;margin:0 auto;padding:0 1.5rem 3.5rem"><h2>Contatti</h2>
   <p style="line-height:1.7">${esc(contenuti.indirizzo)}<br>Telefono: <a href="tel:${esc(contenuti.telefono)}" style="color:${palette.primaria}">${esc(contenuti.telefono)}</a><br>Email: <a href="mailto:${esc(contenuti.email)}" style="color:${palette.primaria}">${esc(contenuti.email)}</a>${contenuti.orari ? `<br>Orari: ${esc(contenuti.orari)}` : ''}</p>
-  <p><a href="tel:${esc(contenuti.telefono)}" style="${stilePulsante(palette)}">Chiamaci ora</a></p></section>
+  ${contenuti.indirizzo ? `<div style="margin:1.25rem 0"><iframe title="Dove siamo: ${esc(contenuti.indirizzo)}" src="https://www.google.com/maps?q=${encodeURIComponent(contenuti.indirizzo)}&output=embed" loading="lazy" style="width:100%;height:280px;border:0;border-radius:12px"></iframe></div>` : ''}
+  <p><a class="sv-btn" href="tel:${esc(contenuti.telefono)}" style="${stilePulsante(palette)}">Chiamaci ora</a></p></section>
 <footer style="background:${palette.secondaria};color:#fff;padding:2rem 1.5rem;text-align:center">
   <p style="margin:.25rem">${esc(contenuti.indirizzo)} · ${esc(contenuti.email)}</p>
   <p style="margin:.25rem;opacity:.7;font-size:.85rem">Sito creato con Sitevaro · Template ${esc(template.nome)}</p>
