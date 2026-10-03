@@ -406,6 +406,9 @@ function renderSito({ sito, template, contenuti }) {
     ? contenuti.foto
     : [fotoTpl.hero, ...fotoTpl.galleria];
   const etichettaSezione = { 'ristorante': 'Menu', 'attivita-locale': 'Servizi', 'freelance-portfolio': 'Progetti', 'e-commerce': 'Prodotti' }[template.categoria] || 'Servizi';
+  // Icona nella scheda del browser: iniziale dell'attività sui suoi colori.
+  const iniziale = (String(contenuti.nome_attivita || 'S').trim().charAt(0) || 'S').toUpperCase();
+  const favicon = 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='${palette.secondaria}'/><text x='32' y='45' font-family='Georgia, serif' font-size='36' font-weight='700' fill='#ffffff' text-anchor='middle'>${iniziale}</text></svg>`);
 
   return `<!doctype html>
 <html lang="it">
@@ -413,6 +416,7 @@ function renderSito({ sito, template, contenuti }) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${titolo} — powered by Sitevaro</title>
+<link rel="icon" type="image/svg+xml" href="${favicon}">
 <link href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(font)}:wght@400;600;700&family=${encodeURIComponent(fontTesto(template.categoria))}:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 html{scroll-behavior:smooth}
@@ -1224,6 +1228,16 @@ try {
 } catch (e) {
   console.warn('⚠️  vetrina.html non trovata: la vetrina alla radice non sarà servita.');
 }
+// Logo "S" di Sitevaro: compare nella scheda del browser e nei risultati
+// di ricerca (favicon). Stessi colori del marchio: verde scuro e crema.
+const FAVICON_SVG = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='#16241c'/><text x='32' y='45' font-family='Georgia, serif' font-size='38' font-weight='700' fill='#f5efdf' text-anchor='middle'>S</text></svg>`;
+
+app.get('/favicon.svg', (req, res) => {
+  res.type('image/svg+xml');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.send(FAVICON_SVG);
+});
+
 app.get('/', (req, res) => {
   if (!vetrinaHtml) return res.status(503).send('Vetrina non disponibile');
   res.setHeader('Content-Security-Policy',
