@@ -1529,8 +1529,8 @@
             }
             sitiList.innerHTML = siti.map(function (s) {
               var url = s.url || (s.slug ? '/s/' + s.slug : '');
-              var href = '';
-              if (url) href = /^https?:\/\//i.test(url) ? url : (API_BASE + (url.charAt(0) === '/' ? url : '/' + url));
+              var href = s.dominio ? ('https://' + s.dominio) : '';
+              if (!href && url) href = /^https?:\/\//i.test(url) ? url : (API_BASE + (url.charAt(0) === '/' ? url : '/' + url));
               var tplName = s.template_nome || '';
               if (!tplName) {
                 var found = null;
@@ -2017,7 +2017,7 @@
         chip(sito.lavorazione) +
       '</div>' +
       (sito.lavorazione === 'pubblicato'
-        ? '<p class="svm-sub">Il tuo sito è online: <a href="' + API + esc(sito.url) + '" target="_blank" rel="noopener">visitalo qui</a>. Da questo modulo puoi inviarci aggiornamenti quando vuoi.</p>'
+        ? '<p class="svm-sub">Il tuo sito è online: <a href="' + (sito.dominio ? 'https://' + esc(sito.dominio) : API + esc(sito.url)) + '" target="_blank" rel="noopener">visitalo qui</a>. Da questo modulo puoi inviarci aggiornamenti quando vuoi.</p>'
         : '<p class="svm-sub">Mandaci testi, foto e listino: costruiamo noi il tuo sito con questo design.</p>') +
       '<form class="svm-form">' +
         '<label>Nome della tua attività *<input name="nome_attivita" required value="' + esc(val(c.nome_attivita)) + '" placeholder="Es. Trattoria Da Luigi"></label>' +
@@ -2116,8 +2116,11 @@
         '<label class="svm-stato">Stato di lavorazione <select class="svm-stato-sel">' + stati + '</select></label>' +
         '<label>Contenuti del sito (JSON)<textarea class="svm-contenuti" rows="8">' +
           esc(JSON.stringify(o.contenuti || {}, null, 2)) + '</textarea></label>' +
+        '<label>Dominio del cliente <input type="text" class="svm-dominio" placeholder="www.ristorantedagino.it" value="' + esc(o.dominio || '') + '"></label>' +
+        '<div class="svm-sub">Scrivi il dominio del cliente e salva: deve anche essere aggiunto su Render (Settings → Custom Domains) e il DNS del cliente deve puntare al servizio. Vuoto = scollegato.</div>' +
         '<div class="svm-row"><button class="svm-btn svm-salva-stato" type="button">Salva stato</button>' +
-        '<button class="svm-btn svm-salva-contenuti" type="button">Salva contenuti</button></div>' +
+        '<button class="svm-btn svm-salva-contenuti" type="button">Salva contenuti</button>' +
+        '<button class="svm-btn svm-salva-dominio" type="button">Salva dominio</button></div>' +
         '<p class="svm-msg" hidden></p>' +
       '</div>';
     }).join('');
@@ -2147,6 +2150,14 @@
         api('/api/admin/siti/' + id + '/contenuti', { method: 'PUT', body: JSON.stringify(obj) })
           .then(function () { esito(true, 'Contenuti salvati: il sito è aggiornato.'); })
           .catch(function (e) { esito(false, e.message); });
+      });
+      card.querySelector('.svm-salva-dominio').addEventListener('click', function () {
+        api('/api/admin/siti/' + id + '/dominio', {
+          method: 'PATCH',
+          body: JSON.stringify({ dominio: card.querySelector('.svm-dominio').value })
+        }).then(function (d) {
+          esito(true, d.dominio ? 'Dominio collegato: ' + d.dominio : 'Dominio scollegato.');
+        }).catch(function (e) { esito(false, e.message); });
       });
     });
   }

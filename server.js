@@ -135,6 +135,19 @@ try {
   console.error('Migrazione colonna nome fallita:', e.message);
 }
 
+// Dominio personalizzato del cliente (es. www.ristorantedagino.it):
+// quando presente, il sito risponde anche su quel dominio (vedi rotta
+// pubblica dei siti). NULL = sito solo su /s/<slug> del dominio Sitevaro.
+try {
+  const colonneSiti2 = db.prepare('PRAGMA table_info(siti)').all().map((c) => c.name);
+  if (!colonneSiti2.includes('dominio')) {
+    db.exec('ALTER TABLE siti ADD COLUMN dominio TEXT');
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_siti_dominio ON siti(dominio)');
+  }
+} catch (e) {
+  console.error('Migrazione colonna dominio fallita:', e.message);
+}
+
 // Cartella dei file caricati dai clienti (foto e logo), sullo stesso disco dati
 const UPLOAD_DIR = path.join(path.dirname(DB_PATH), 'uploads');
 try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch (e) { /* creata al primo upload */ }
@@ -901,6 +914,7 @@ function serializzaSito(sito) {
     categoria: sito.categoria,
     lavorazione: sito.lavorazione || 'in-attesa-materiali',
     url: `/s/${sito.slug}`,
+    dominio: sito.dominio || null,
     contenuti: JSON.parse(sito.contenuti_json || '{}'),
     created_at: sito.created_at,
   };
@@ -1048,7 +1062,26 @@ adminRoutes.patch('/siti/:id/lavorazione', richiedeAuth, richiedeAdmin, (req, re
   res.json({ ok: true, lavorazione: stato });
 });
 
-// PUT /api/admin/siti/:id/contenuti — l'operatore compila i contenuti veri
+// PATCH /api/admin/siti/:id/dominio { dominio } — collega il dominio
+// personalizzato del cliente al suo sito (es. www.ristorantedagino.it).
+// Stringa vuota per scollegarlo. Perché il dominio risponda serve anche
+// averlo aggiunto una volta in Render (Settings → Custom Domains) e che
+// il cliente punti il suo DNS sul servizio.
+adminRoutes.patch('/siti/:id/dominio', richiedeAuth, richiedeAdmin, (req, res) => {
+  const sito = db.prepare('SELECT * FROM siti WHERE id = ?').get(req.params.id);
+  if (!sito) return res.status(404).json({ errore: 'Sito non trovato' });
+  let dominio = typeof (req.body && req.body.dominio) === 'string' ? req.body.dominio.trim().toLowerCase() : '';
+  dominio = dominio.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  if (dominio && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(dominio)) {
+    return res.status(400).json({ errore: 'Dominio non valido: scrivilo come www.nomecliente.it' });
+  }
+  if (dominio) {
+    const altro = db.prepare('SELECT id FROM siti WHERE dominio = ? AND id != ?').get(dominio, sito.id);
+    if (altro) return res.status(409).json({ errore: 'Dominio già collegato a un altro sito' });
+  }
+  db.prepare('UPDATE siti SET dominio = ? WHERE id = ?').run(dominio || null, sito.id);
+  res.json({ ok: true, dominio: dominio || null });
+});
 adminRoutes.put('/siti/:id/contenuti', richiedeAuth, richiedeAdmin, (req, res) => {
   const sito = db.prepare('SELECT * FROM siti WHERE id = ?').get(req.params.id);
   if (!sito) return res.status(404).json({ errore: 'Sito non trovato' });
@@ -1228,6 +1261,29 @@ try {
 } catch (e) {
   console.warn('⚠️  vetrina.html non trovata: la vetrina alla radice non sarà servita.');
 }
+// Dominio personalizzato del cliente: se la richiesta alla pagina "/"
+// arriva da un dominio collegato a un sito (es. www.ristorantedagino.it),
+// mostriamo quel sito invece della vetrina. Sul dominio principale di
+// Sitevaro (onrender.com o il futuro dominio della piattaforma) non
+// intercetta nulla. Accetta sia la forma con www che senza.
+app.use((req, res, next) => {
+  if (req.method !== 'GET' || req.path !== '/') return next();
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '')
+    .split(',')[0].trim().toLowerCase().replace(/:\d+$/, '');
+  if (!host || host === 'localhost' || host.endsWith('.onrender.com')) return next();
+  const senzaWww = host.replace(/^www\./, '');
+  const sito = db.prepare(`
+    SELECT s.*, t.categoria, t.nome AS template_nome, t.layout, t.palette, t.font
+    FROM siti s JOIN template t ON t.id = s.template_id
+    WHERE lower(s.dominio) IN (?, ?, ?)
+  `).get(host, senzaWww, 'www.' + senzaWww);
+  if (!sito) return next();
+  if (sito.stato !== 'attivo') {
+    return res.status(410).send('<h1>Sito temporaneamente sospeso</h1><p>Abbonamento non attivo.</p>');
+  }
+  res.send(renderSito({ sito, template: sito, contenuti: JSON.parse(sito.contenuti_json || '{}') }));
+});
+
 // Logo "S" di Sitevaro: compare nella scheda del browser e nei risultati
 // di ricerca (favicon). Stessi colori del marchio: verde scuro e crema.
 const FAVICON_SVG = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='#16241c'/><text x='32' y='45' font-family='Georgia, serif' font-size='38' font-weight='700' fill='#f5efdf' text-anchor='middle'>S</text></svg>`;
