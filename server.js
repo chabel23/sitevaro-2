@@ -355,57 +355,72 @@ const CTA_SITO = {
   'e-commerce': ['Scopri i prodotti', '#servizi'],
 };
 
+// Intestazione di sezione con etichetta e filetto colorato (stile agenzia).
+function intestazione(eyebrow, titolo) {
+  return `<p class="sv-eyebrow">${esc(eyebrow)}</p><h2>${esc(titolo)}</h2><div class="sv-linea"></div>`;
+}
+
 function hero(contenuti, palette, layout, fotoHero, categoria) {
   const titolo = esc(contenuti.nome_attivita);
   const tagline = esc(contenuti.tagline);
   const ctaCfg = CTA_SITO[categoria] || CTA_SITO['attivita-locale'];
   const ctaHref = ctaCfg[1] === 'tel' ? `tel:${esc(contenuti.telefono)}`
     : ctaCfg[1] === 'mail' ? `mailto:${esc(contenuti.email)}` : ctaCfg[1];
-  const cta = `<p style="margin:1.75rem 0 0"><a class="sv-btn" href="${ctaHref}" style="${stilePulsante(palette)}">${ctaCfg[0]}</a></p>`;
+  const secLabel = { 'ristorante': 'il menu', 'attivita-locale': 'i servizi', 'freelance-portfolio': 'i progetti', 'e-commerce': 'i contatti' }[categoria] || 'i servizi';
+  const secHref = categoria === 'e-commerce' ? '#contatti' : '#servizi';
+  const bottoni = `<div style="display:flex;gap:.9rem;flex-wrap:wrap;margin-top:1.9rem">
+    <a class="sv-btn" href="${ctaHref}" style="${stilePulsante(palette)};padding:1rem 2rem;font-size:1.02rem;box-shadow:0 10px 24px rgba(0,0,0,.18)">${ctaCfg[0]}</a>
+    <a class="sv-btn" href="${secHref}" style="${stilePulsante(palette)};background:rgba(255,255,255,.14);color:inherit;border:2px solid currentColor;box-shadow:none">Vedi ${secLabel}</a></div>`;
+  const eyebrow = `<p style="font-size:.78rem;font-weight:700;letter-spacing:.24em;text-transform:uppercase;opacity:.75;margin:0 0 1rem">${esc(NOMI_CATEGORIE[categoria] || '')}</p>`;
   if (layout.includes('fullscreen')) {
-    return `<section id="home" style="min-height:70vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;background:linear-gradient(rgba(10,15,12,.45),rgba(10,15,12,.6)),url('${esc(fotoHero)}') center/cover,linear-gradient(135deg,${palette.primaria},${palette.secondaria});color:#fff;padding:4rem 1.5rem">
-      <h1 style="font-size:3rem;margin:0 0 1rem">${titolo}</h1><p style="font-size:1.3rem;opacity:.9">${tagline}</p>${cta}</section>`;
+    return `<section id="home" style="min-height:82vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;background:linear-gradient(rgba(10,15,12,.48),rgba(10,15,12,.65)),url('${esc(fotoHero)}') center/cover,linear-gradient(135deg,${palette.primaria},${palette.secondaria});color:#fff;padding:5rem 1.5rem">
+      ${eyebrow}<h1 style="font-size:clamp(2.5rem,6vw,4.1rem);margin:0 0 1rem;max-width:820px">${titolo}</h1><p style="font-size:clamp(1.1rem,2.2vw,1.35rem);opacity:.92;max-width:640px;margin:0">${tagline}</p>
+      <div style="display:flex;justify-content:center">${bottoni}</div></section>`;
   }
   if (layout.includes('split') || layout.includes('personale')) {
-    return `<section id="home" style="display:flex;flex-wrap:wrap;align-items:center;gap:2rem;padding:4rem 1.5rem;max-width:1100px;margin:0 auto">
-      <div style="flex:1;min-width:260px"><h1 style="font-size:2.6rem;margin:0 0 1rem">${titolo}</h1>
-      <p style="font-size:1.2rem;color:${palette.secondaria}">${tagline}</p>
-      <p>${esc(contenuti.descrizione)}</p>${cta}</div>
-      <div style="flex:1;min-width:260px;border-radius:16px;min-height:280px;background:url('${esc(fotoHero)}') center/cover"></div></section>`;
+    return `<section id="home" style="padding:4.5rem 0 3.5rem"><div class="sv-wrap" style="display:flex;flex-wrap:wrap;align-items:center;gap:2.5rem">
+      <div style="flex:1;min-width:280px">${eyebrow}<h1 style="font-size:clamp(2.3rem,5vw,3.4rem);margin:0 0 1rem">${titolo}</h1>
+      <p style="font-size:1.25rem;color:${palette.secondaria};margin:0">${tagline}</p>
+      <p style="margin:1rem 0 0">${esc(contenuti.descrizione)}</p>${bottoni}</div>
+      <div style="flex:1;min-width:280px;border-radius:18px;min-height:340px;background:url('${esc(fotoHero)}') center/cover;box-shadow:0 24px 48px rgba(15,25,20,.22)"></div></div></section>`;
   }
-  return `<section id="home" style="text-align:center;padding:4rem 1.5rem 2rem;background:${palette.sfondo}">
-    <h1 style="font-size:2.8rem;margin:0 0 1rem">${titolo}</h1><p style="font-size:1.25rem">${tagline}</p>${cta}
-    <img src="${esc(fotoHero)}" alt="${titolo}" style="width:min(900px,100%);height:340px;object-fit:cover;border-radius:16px;margin-top:2rem"></section>`;
+  return `<section id="home" style="text-align:center;padding:4.5rem 0 3.5rem"><div class="sv-wrap">${eyebrow}
+    <h1 style="font-size:clamp(2.4rem,5.5vw,3.6rem);margin:0 0 1rem">${titolo}</h1><p style="font-size:1.25rem;margin:0 auto;max-width:640px">${tagline}</p>
+    <div style="display:flex;justify-content:center">${bottoni}</div>
+    <img src="${esc(fotoHero)}" alt="${titolo}" style="width:100%;aspect-ratio:16/8;object-fit:cover;border-radius:18px;margin-top:2.5rem;box-shadow:0 24px 48px rgba(15,25,20,.18)"></div></section>`;
 }
 
 function sezioniCategoria(contenuti, palette, categoria, foto) {
   const immagini = Array.isArray(foto) && foto.length ? foto : [];
-  const card = (titolo, corpo, extra = '', indice = 0) =>
-    `<div class="sv-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.05)">
-      ${immagini.length ? `<img src="${esc(immagini[indice % immagini.length])}" alt="" loading="lazy" style="width:100%;height:150px;object-fit:cover;display:block">` : ''}
-      <div style="padding:1.25rem 1.5rem 1.5rem"><h3 style="margin-top:0;color:${palette.primaria}">${esc(titolo)}</h3><p>${esc(corpo)}</p>${extra}</div></div>`;
   const griglia = (items) =>
-    `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem">${items}</div>`;
+    `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem;margin-top:2rem">${items}</div>`;
+  const cardTesto = (titolo, corpo, extra = '') =>
+    `<div class="sv-card" style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:16px;padding:1.6rem;box-shadow:0 4px 14px rgba(15,25,20,.05)"><h3 style="margin:0 0 .6rem;color:${palette.primaria}">${esc(titolo)}</h3><p style="margin:0">${esc(corpo)}</p>${extra}</div>`;
+  const cardFoto = (titolo, corpo, extra, indice) =>
+    `<div class="sv-card" style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:16px;overflow:hidden;box-shadow:0 4px 14px rgba(15,25,20,.05)">
+      <img src="${esc(immagini[indice % Math.max(immagini.length, 1)] || '')}" alt="" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;display:block">
+      <div style="padding:1.25rem 1.5rem 1.5rem"><h3 style="margin:0 0 .5rem;color:${palette.primaria}">${esc(titolo)}</h3><p style="margin:0">${esc(corpo)}</p>${extra}</div></div>`;
 
   if (categoria === 'ristorante' && contenuti.piatti) {
-    return `<section id="servizi" style="max-width:1100px;margin:0 auto;padding:2rem 1.5rem"><h2>Il nostro menu</h2>${griglia(contenuti.piatti.map((p, i) =>
-      card(p.nome, p.descrizione, `<strong>${esc(p.prezzo)}</strong>`, i)).join(''))}</section>
-      <section style="max-width:1100px;margin:0 auto;padding:1rem 1.5rem 3rem"><p><strong>Orari:</strong> ${esc(contenuti.orari)}</p></section>`;
+    // Menu elegante in stile ristorante: nome, puntini, prezzo allineato.
+    return `<section id="servizi" style="background:#fff;padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione('Il nostro menu', 'Assapora le nostre specialità')}
+      <div class="sv-menu" style="margin-top:1.6rem">${contenuti.piatti.map((p) =>
+        `<div class="sv-riga"><div style="flex:1;min-width:0"><strong style="font-size:1.05rem">${esc(p.nome)}</strong><div style="opacity:.72;font-size:.92rem">${esc(p.descrizione)}</div></div><span class="sv-dots"></span><strong style="color:${palette.primaria};white-space:nowrap">${esc(p.prezzo)}</strong></div>`).join('')}</div></div></section>`;
   }
   if (categoria === 'attivita-locale' && contenuti.servizi) {
-    return `<section id="servizi" style="max-width:1100px;margin:0 auto;padding:2rem 1.5rem"><h2>I nostri servizi</h2>${griglia(contenuti.servizi.map((s, i) =>
-      card(s.nome, s.descrizione, '', i)).join(''))}</section>
-      <section style="max-width:1100px;margin:0 auto;padding:1rem 1.5rem 3rem"><p><strong>Orari:</strong> ${esc(contenuti.orari)}</p></section>`;
+    return `<section id="servizi" style="background:#fff;padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione('I nostri servizi', 'Cosa possiamo fare per te')}
+      ${griglia(contenuti.servizi.map((s, i) =>
+        `<div class="sv-card" style="background:${palette.sfondo};border:1px solid rgba(0,0,0,.06);border-radius:16px;padding:1.6rem"><span class="sv-check">${i + 1}</span><h3 style="margin:.9rem 0 .5rem;color:${palette.primaria}">${esc(s.nome)}</h3><p style="margin:0">${esc(s.descrizione)}</p></div>`).join(''))}</div></section>`;
   }
   if (categoria === 'freelance-portfolio' && contenuti.progetti) {
-    return `<section id="servizi" style="max-width:1100px;margin:0 auto;padding:2rem 1.5rem"><h2 style="color:${palette.secondaria}">${esc(contenuti.ruolo)}</h2>
-      <p>${esc(contenuti.bio)}</p><h2>Progetti</h2>${griglia(contenuti.progetti.map((p, i) =>
-      card(p.titolo, p.descrizione, '', i)).join(''))}</section>`;
+    return `<section id="servizi" style="background:#fff;padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione(contenuti.ruolo || 'Portfolio', 'Progetti selezionati')}
+      <p style="max-width:720px;margin:1.2rem 0 0">${esc(contenuti.bio || '')}</p>
+      ${griglia(contenuti.progetti.map((p, i) => cardFoto(p.titolo, p.descrizione, '', i)).join(''))}</div></section>`;
   }
   if (categoria === 'e-commerce' && contenuti.prodotti) {
-    return `<section id="servizi" style="max-width:1100px;margin:0 auto;padding:2rem 1.5rem"><h2>I nostri prodotti</h2>${griglia(contenuti.prodotti.map((p, i) =>
-      card(p.nome, p.descrizione, `<div style="margin-top:.5rem"><strong>${esc(p.prezzo)}</strong>
-      <a class="sv-btn" href="mailto:${esc(contenuti.email)}?subject=Ordine: ${esc(p.nome)}" style="${stilePulsante(palette)};margin-left:.75rem;padding:.5rem 1rem">Ordina</a></div>`, i)).join(''))}</section>`;
+    return `<section id="servizi" style="background:#fff;padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione('Il catalogo', 'I nostri prodotti')}
+      ${griglia(contenuti.prodotti.map((p, i) => cardFoto(p.nome, p.descrizione,
+        `<div style="margin-top:.9rem;display:flex;align-items:center;gap:.9rem"><strong style="font-size:1.08rem">${esc(p.prezzo)}</strong><a class="sv-btn" href="mailto:${esc(contenuti.email)}?subject=Ordine: ${esc(p.nome)}" style="${stilePulsante(palette)};padding:.5rem 1.1rem">Ordina</a></div>`, i)).join(''))}</div></section>`;
   }
   return '';
 }
@@ -422,6 +437,25 @@ function renderSito({ sito, template, contenuti }) {
   // Icona nella scheda del browser: iniziale dell'attività sui suoi colori.
   const iniziale = (String(contenuti.nome_attivita || 'S').trim().charAt(0) || 'S').toUpperCase();
   const favicon = 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='${palette.secondaria}'/><text x='32' y='45' font-family='Georgia, serif' font-size='36' font-weight='700' fill='#ffffff' text-anchor='middle'>${iniziale}</text></svg>`);
+  // Banda di fiducia sotto l'hero: solo dati veri del cliente (niente
+  // promesse inventate): dove si trova, quando è aperto, come contattarlo
+  // e, se ci sono, le recensioni.
+  const puntiTrust = [];
+  if (contenuti.indirizzo) puntiTrust.push(['Dove siamo', esc(contenuti.indirizzo)]);
+  if (contenuti.orari) puntiTrust.push(['Orari', esc(contenuti.orari)]);
+  if (contenuti.telefono) puntiTrust.push(['Contattaci', esc(contenuti.telefono)]);
+  if (Array.isArray(contenuti.recensioni) && contenuti.recensioni.length) {
+    puntiTrust.push(['I clienti ci amano', `<span style="color:${palette.accento};letter-spacing:.12em">★★★★★</span> ${contenuti.recensioni.length} recensioni`]);
+  }
+  const social = contenuti.social && typeof contenuti.social === 'object' ? contenuti.social : {};
+  const linkSocial = (nome, valore, base) => {
+    if (!valore) return '';
+    const v = String(valore).trim();
+    const href = /^https?:\/\//i.test(v) ? v : base + v.replace(/^@/, '');
+    return `<a href="${esc(href)}" target="_blank" rel="noopener" style="color:#fff;font-weight:600">${nome}</a>`;
+  };
+  const socialHtml = [linkSocial('Instagram', social.instagram, 'https://instagram.com/'), linkSocial('Facebook', social.facebook, 'https://facebook.com/')].filter(Boolean).join(' · ');
+  const numeroWa = String(contenuti.whatsapp || '').replace(/\D/g, '');
 
   return `<!doctype html>
 <html lang="it">
@@ -443,34 +477,58 @@ a{transition:color .2s ease,background-color .2s ease,transform .2s ease,box-sha
 .sv-card:hover{transform:translateY(-4px);box-shadow:0 14px 30px rgba(15,25,20,.13)}
 .sv-btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
 img{background:#e8e2d2}
+.sv-wrap{max-width:1120px;margin:0 auto;padding:0 1.5rem}
+.sv-eyebrow{font-size:.78rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:${palette.primaria};margin:0 0 .5rem}
+.sv-linea{width:56px;height:3px;border-radius:99px;background:${palette.accento};margin:.9rem 0 0}
+.sv-trust{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1rem}
+.sv-gal{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1rem}
+.sv-gal img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:14px;display:block}
+.sv-menu{display:grid;gap:0 3.5rem}
+@media(min-width:820px){.sv-menu{grid-template-columns:1fr 1fr}}
+.sv-riga{display:flex;align-items:baseline;gap:.8rem;padding:.9rem 0;border-bottom:1px solid rgba(0,0,0,.06)}
+.sv-dots{flex:1;border-bottom:2px dotted rgba(0,0,0,.22);transform:translateY(-4px)}
+.sv-pf{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1.25rem}
+.sv-check{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:${palette.primaria};color:#fff;font-weight:700;flex:none}
+.sv-navlink{padding:.55rem .95rem;border-radius:999px;color:#fff;text-decoration:none;font-weight:600}
+.sv-navlink:hover{background:rgba(255,255,255,.16)}
+.sv-wa{position:fixed;right:18px;bottom:18px;z-index:40;background:#22c064;color:#fff;font-weight:700;text-decoration:none;padding:.85rem 1.25rem;border-radius:999px;box-shadow:0 10px 24px rgba(0,0,0,.25)}
+.sv-wa:hover{filter:brightness(1.06)}
 @media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
-<header style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;padding:1rem 1.5rem;background:${palette.secondaria};color:#fff;position:sticky;top:0;z-index:20;box-shadow:0 2px 12px rgba(0,0,0,.15)">
-  <strong style="font-size:1.2rem">${titolo}</strong>
-  <nav style="display:flex;gap:1.25rem;flex-wrap:wrap;font-size:.95rem">
-    <a href="#home" style="color:#fff;text-decoration:none">Home</a>
-    <a href="#servizi" style="color:#fff;text-decoration:none">${etichettaSezione}</a>
-    <a href="#foto" style="color:#fff;text-decoration:none">Foto</a>
-    <a href="#contatti" style="color:#fff;text-decoration:none">Contatti</a>
+<header style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;padding:.8rem 1.5rem;background:${palette.secondaria};color:#fff;position:sticky;top:0;z-index:20;box-shadow:0 2px 12px rgba(0,0,0,.15)">
+  <a href="#home" style="display:flex;align-items:center;gap:.65rem;color:#fff;text-decoration:none">
+    <span style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:12px;background:${palette.accento};font-weight:700;font-family:'${font}',serif;font-size:1.1rem">${iniziale}</span>
+    <strong style="font-size:1.15rem">${titolo}</strong></a>
+  <nav style="display:flex;gap:.25rem;flex-wrap:wrap">
+    <a class="sv-navlink" href="#home">Home</a>
+    <a class="sv-navlink" href="#chisiamo">Chi siamo</a>
+    <a class="sv-navlink" href="#servizi">${etichettaSezione}</a>
+    <a class="sv-navlink" href="#foto">Foto</a>
+    <a class="sv-navlink" href="#contatti">Contatti</a>
   </nav>
-  <a href="tel:${esc(contenuti.telefono)}" style="color:#fff;text-decoration:none">${esc(contenuti.telefono)}</a>
+  <a href="tel:${esc(contenuti.telefono)}" style="color:#fff;text-decoration:none;font-weight:700">${esc(contenuti.telefono)}</a>
 </header>
 ${hero(contenuti, palette, template.layout, fotoSito[0], template.categoria)}
-<section id="chisiamo" style="max-width:1100px;margin:0 auto;padding:2.5rem 1.5rem 0.5rem"><h2>Chi siamo</h2><p style="font-size:1.05rem;line-height:1.6">${esc(contenuti.descrizione)}</p></section>
+${puntiTrust.length ? `<section style="background:#fff;border-bottom:1px solid rgba(0,0,0,.06);padding:1.7rem 0"><div class="sv-wrap"><div class="sv-trust">${puntiTrust.map(([etichettaTrust, valoreTrust]) => `<div><div style="font-size:.72rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:${palette.primaria}">${etichettaTrust}</div><div style="font-weight:600;margin-top:.3rem">${valoreTrust}</div></div>`).join('')}</div></div></section>` : ''}
+<section id="chisiamo" style="padding:4rem 0 3rem"><div class="sv-wrap">${intestazione('Chi siamo', 'La nostra storia')}<p style="font-size:1.08rem;line-height:1.75;max-width:760px;margin-top:1.4rem">${esc(contenuti.descrizione)}</p></div></section>
 ${sezioniCategoria(contenuti, palette, template.categoria, fotoSito)}
-${Array.isArray(contenuti.recensioni) && contenuti.recensioni.length ? `<section id="recensioni" style="max-width:1100px;margin:0 auto;padding:0 1.5rem 3rem"><h2>Cosa dicono di noi</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem">${contenuti.recensioni.slice(0, 6).map((r) => `<div class="sv-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,.05)"><div style="color:${palette.accento};letter-spacing:.15em" aria-hidden="true">${'★'.repeat(Math.max(1, Math.min(5, r.stelle || 5)))}</div><p style="font-style:italic">“${esc(r.testo)}”</p><strong>${esc(r.nome)}</strong></div>`).join('')}</div></section>` : ''}
-<section id="foto" style="max-width:1100px;margin:0 auto;padding:0 1.5rem 3rem"><h2>Le nostre foto</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem">${fotoSito.map((f) => `<img src="${esc(f)}" alt="" loading="lazy" style="width:100%;height:220px;object-fit:cover;border-radius:12px">`).join('')}</div></section>
-${Array.isArray(contenuti.faq) && contenuti.faq.length ? `<section id="faq" style="max-width:1100px;margin:0 auto;padding:0 1.5rem 3rem"><h2>Domande frequenti</h2>${contenuti.faq.slice(0, 8).map((f) => `<details style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:1rem 1.25rem;margin-bottom:.75rem"><summary style="font-weight:600;cursor:pointer;padding:.25rem 0">${esc(f.domanda || f.d || '')}</summary><p>${esc(f.risposta || f.r || '')}</p></details>`).join('')}</section>` : ''}
-<section id="contatti" style="max-width:1100px;margin:0 auto;padding:0 1.5rem 3.5rem"><h2>Contatti</h2>
-  <p style="line-height:1.7">${esc(contenuti.indirizzo)}<br>Telefono: <a href="tel:${esc(contenuti.telefono)}" style="color:${palette.primaria}">${esc(contenuti.telefono)}</a><br>Email: <a href="mailto:${esc(contenuti.email)}" style="color:${palette.primaria}">${esc(contenuti.email)}</a>${contenuti.orari ? `<br>Orari: ${esc(contenuti.orari)}` : ''}</p>
-  ${contenuti.indirizzo ? `<div style="margin:1.25rem 0"><iframe title="Dove siamo: ${esc(contenuti.indirizzo)}" src="https://www.google.com/maps?q=${encodeURIComponent(contenuti.indirizzo)}&output=embed" loading="lazy" style="width:100%;height:280px;border:0;border-radius:12px"></iframe></div>` : ''}
-  <p><a class="sv-btn" href="tel:${esc(contenuti.telefono)}" style="${stilePulsante(palette)}">Chiamaci ora</a></p></section>
-<footer style="background:${palette.secondaria};color:#fff;padding:2rem 1.5rem;text-align:center">
-  <p style="margin:.25rem">${esc(contenuti.indirizzo)} · ${esc(contenuti.email)}</p>
-  <p style="margin:.25rem;opacity:.7;font-size:.85rem">Sito creato con Sitevaro · Template ${esc(template.nome)}</p>
-</footer>
+${Array.isArray(contenuti.punti_forza) && contenuti.punti_forza.length ? `<section style="padding:4rem 0 3rem"><div class="sv-wrap">${intestazione('Perché sceglierci', 'Il nostro impegno')}<div class="sv-pf" style="margin-top:2rem">${contenuti.punti_forza.slice(0, 3).map((p) => `<div class="sv-card" style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:16px;padding:1.6rem;box-shadow:0 4px 14px rgba(15,25,20,.05)"><span class="sv-check">✓</span><p style="margin:.95rem 0 0;font-weight:600;font-size:1.02rem">${esc(p)}</p></div>`).join('')}</div></div></section>` : ''}
+${Array.isArray(contenuti.recensioni) && contenuti.recensioni.length ? `<section id="recensioni" style="background:#fff;padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione('Recensioni', 'Cosa dicono di noi')}<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem;margin-top:2rem">${contenuti.recensioni.slice(0, 6).map((r) => `<div class="sv-card" style="background:${palette.sfondo};border:1px solid rgba(0,0,0,.06);border-radius:16px;padding:1.6rem"><div style="color:${palette.accento};letter-spacing:.15em" aria-hidden="true">${'★'.repeat(Math.max(1, Math.min(5, r.stelle || 5)))}</div><p style="font-style:italic;font-size:1.02rem;margin:.8rem 0">“${esc(r.testo)}”</p><strong>${esc(r.nome)}</strong></div>`).join('')}</div></div></section>` : ''}
+<section id="foto" style="padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione('Galleria', 'Le nostre foto')}<div class="sv-gal" style="margin-top:2rem">${(fotoSito.length > 1 ? fotoSito.slice(1) : fotoSito).map((f) => `<img src="${esc(f)}" alt="" loading="lazy">`).join('')}</div></div></section>
+${Array.isArray(contenuti.faq) && contenuti.faq.length ? `<section id="faq" style="padding:0 0 3.5rem"><div class="sv-wrap">${intestazione('Aiuto', 'Domande frequenti')}${contenuti.faq.slice(0, 8).map((f, i) => `<details style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:14px;padding:1rem 1.25rem;margin:${i === 0 ? '2rem' : '0'} 0 .75rem"><summary style="font-weight:600;cursor:pointer;padding:.25rem 0">${esc(f.domanda || f.d || '')}</summary><p>${esc(f.risposta || f.r || '')}</p></details>`).join('')}</div></section>` : ''}
+<section id="contatti" style="background:#fff;padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione('Contatti', 'Vieni a trovarci')}
+  <p style="line-height:1.8;margin-top:1.6rem">${esc(contenuti.indirizzo)}<br>Telefono: <a href="tel:${esc(contenuti.telefono)}" style="color:${palette.primaria};font-weight:600">${esc(contenuti.telefono)}</a><br>Email: <a href="mailto:${esc(contenuti.email)}" style="color:${palette.primaria};font-weight:600">${esc(contenuti.email)}</a>${contenuti.orari ? `<br>Orari: ${esc(contenuti.orari)}` : ''}</p>
+  ${contenuti.indirizzo ? `<div style="margin:1.5rem 0"><iframe title="Dove siamo: ${esc(contenuti.indirizzo)}" src="https://www.google.com/maps?q=${encodeURIComponent(contenuti.indirizzo)}&output=embed" loading="lazy" style="width:100%;height:300px;border:0;border-radius:14px"></iframe></div>` : ''}
+  <p style="display:flex;gap:.9rem;flex-wrap:wrap"><a class="sv-btn" href="tel:${esc(contenuti.telefono)}" style="${stilePulsante(palette)}">Chiamaci ora</a>${numeroWa ? `<a class="sv-btn" href="https://wa.me/${numeroWa}" target="_blank" rel="noopener" style="${stilePulsante(palette)};background:#22c064">Scrivici su WhatsApp</a>` : ''}</p></div></section>
+<footer style="background:${palette.secondaria};color:#fff;padding:2.5rem 0 2rem"><div class="sv-wrap" style="display:flex;flex-wrap:wrap;gap:2rem;justify-content:space-between">
+  <div style="max-width:340px"><strong style="font-size:1.15rem">${titolo}</strong><p style="opacity:.85;margin:.5rem 0 0">${esc(contenuti.tagline)}</p>${socialHtml ? `<p style="margin:.9rem 0 0">${socialHtml}</p>` : ''}</div>
+  <div><div style="font-size:.72rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;opacity:.75">Contatti</div><p style="margin:.6rem 0 0;line-height:1.7">${esc(contenuti.indirizzo)}<br><a href="tel:${esc(contenuti.telefono)}" style="color:#fff">${esc(contenuti.telefono)}</a><br><a href="mailto:${esc(contenuti.email)}" style="color:#fff">${esc(contenuti.email)}</a></p></div>
+  ${contenuti.orari ? `<div><div style="font-size:.72rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;opacity:.75">Orari</div><p style="margin:.6rem 0 0;line-height:1.7">${esc(contenuti.orari)}</p></div>` : ''}
+</div>
+<div class="sv-wrap" style="margin-top:2rem;padding-top:1.2rem;border-top:1px solid rgba(255,255,255,.18);font-size:.85rem;opacity:.75">Sito creato con Sitevaro · Template ${esc(template.nome)}</div></footer>
+${numeroWa ? `<a class="sv-wa" href="https://wa.me/${numeroWa}" target="_blank" rel="noopener">Scrivici su WhatsApp</a>` : ''}
 </body>
 </html>`;
 }
@@ -943,6 +1001,45 @@ sitiApi.put('/:id/contenuti', richiedeAuth, (req, res) => {
   res.json({ sito: serializzaSito(sitoConTemplate(sito.id)) });
 });
 
+// Converte gli elenchi scritti dal cliente ("Nome — €12 — descrizione",
+// uno per riga) in voci strutturate pronte per il sito.
+function parseElencoRighe(testo) {
+  if (typeof testo !== 'string') return [];
+  return testo.split(/\r?\n/).map((r) => r.trim()).filter(Boolean).slice(0, 40).map((riga) => {
+    const parti = riga.split(/\s+[—–|]\s+|\s+-\s+/).map((p) => p.trim()).filter(Boolean);
+    let prezzo = '';
+    let descrizione = '';
+    for (let i = 1; i < parti.length; i++) {
+      if (!prezzo && /€|eur/i.test(parti[i])) prezzo = parti[i];
+      else descrizione = descrizione ? descrizione + ' — ' + parti[i] : parti[i];
+    }
+    return { nome: (parti[0] || '').slice(0, 120), prezzo: prezzo.slice(0, 30), descrizione: descrizione.slice(0, 400) };
+  }).filter((v) => v.nome);
+}
+
+function parsePuntiForza(valore) {
+  const righe = Array.isArray(valore) ? valore : (typeof valore === 'string' ? valore.split(/\r?\n/) : []);
+  return righe.map((r) => String(r).trim().slice(0, 160)).filter(Boolean).slice(0, 3);
+}
+
+// "Nome — testo" una per riga; senza separatore, tutta la riga è il testo.
+function parseRecensioni(testo) {
+  if (typeof testo !== 'string') return [];
+  return testo.split(/\r?\n/).map((r) => r.trim()).filter(Boolean).slice(0, 12).map((riga) => {
+    const p = riga.split(/\s+[—–|]\s+|\s+-\s+/).map((x) => x.trim()).filter(Boolean);
+    if (p.length >= 2) return { nome: p[0].slice(0, 80), testo: p.slice(1).join(' — ').slice(0, 600), stelle: 5 };
+    return { nome: 'Cliente', testo: riga.slice(0, 600), stelle: 5 };
+  });
+}
+
+function parseFaq(testo) {
+  if (typeof testo !== 'string') return [];
+  return testo.split(/\r?\n/).map((r) => r.trim()).filter(Boolean).slice(0, 10).map((riga) => {
+    const p = riga.split(/\s+[—–|]\s+|\s+-\s+/).map((x) => x.trim()).filter(Boolean);
+    return p.length >= 2 ? { domanda: p[0].slice(0, 200), risposta: p.slice(1).join(' — ').slice(0, 800) } : null;
+  }).filter(Boolean);
+}
+
 // POST /api/sites/:id/materiali — il cliente invia testi, foto e logo.
 // I campi di testo compilano subito i contenuti del sito; menu/listino e
 // note restano nei materiali a disposizione di chi costruisce il sito.
@@ -957,6 +1054,23 @@ sitiApi.post('/:id/materiali', richiedeAuth, (req, res) => {
   for (const k of ['nome_attivita', 'tagline', 'descrizione', 'telefono', 'email', 'indirizzo', 'orari', 'ruolo', 'bio']) {
     if (typeof body[k] === 'string' && body[k].trim()) campiTesto[k] = body[k].trim().slice(0, 2000);
   }
+
+  // Informazioni in più che rendono il sito più ricco e credibile:
+  // WhatsApp, profili social, punti di forza, recensioni e domande
+  // frequenti — il cliente li scrive in chiaro, il server li struttura.
+  const extraContenuti = {};
+  if (typeof body.whatsapp === 'string' && body.whatsapp.trim()) extraContenuti.whatsapp = body.whatsapp.trim().slice(0, 40);
+  const socialNuovi = {};
+  if (typeof body.instagram === 'string' && body.instagram.trim()) socialNuovi.instagram = body.instagram.trim().slice(0, 200);
+  if (typeof body.facebook === 'string' && body.facebook.trim()) socialNuovi.facebook = body.facebook.trim().slice(0, 200);
+  if (Object.keys(socialNuovi).length) extraContenuti.social = socialNuovi;
+  const puntiForza = parsePuntiForza(body.punti_forza);
+  if (puntiForza.length) extraContenuti.punti_forza = puntiForza;
+  const recensioniNuove = parseRecensioni(body.recensioni_testo);
+  if (recensioniNuove.length) extraContenuti.recensioni = recensioniNuove;
+  const faqNuove = parseFaq(body.faq_testo);
+  if (faqNuove.length) extraContenuti.faq = faqNuove;
+  const elencoVoci = parseElencoRighe(body.elenco_testo);
 
   const salvaImmagine = (img, prefisso) => {
     if (!img || typeof img.dati !== 'string') return null;
@@ -981,7 +1095,18 @@ sitiApi.post('/:id/materiali', richiedeAuth, (req, res) => {
   const logo = salvaImmagine(body.logo, 'logo');
 
   const attuali = JSON.parse(sito.contenuti_json || '{}');
-  const aggiornati = { ...attuali, ...campiTesto };
+  const aggiornati = { ...attuali, ...campiTesto, ...extraContenuti };
+  if (aggiornati.social && attuali.social) aggiornati.social = { ...attuali.social, ...aggiornati.social };
+  // L'elenco scritto dal cliente diventa subito la lista vera del sito
+  // (menu del ristorante, servizi, progetti o prodotti secondo categoria).
+  if (elencoVoci.length) {
+    const tplMat = db.prepare('SELECT categoria FROM template WHERE id = ?').get(sito.template_id);
+    const catMat = tplMat && tplMat.categoria;
+    if (catMat === 'ristorante') aggiornati.piatti = elencoVoci.map((v) => ({ nome: v.nome, prezzo: v.prezzo, descrizione: v.descrizione }));
+    else if (catMat === 'attivita-locale') aggiornati.servizi = elencoVoci.map((v) => ({ nome: v.nome, descrizione: v.descrizione || v.prezzo }));
+    else if (catMat === 'freelance-portfolio') aggiornati.progetti = elencoVoci.map((v) => ({ titolo: v.nome, descrizione: v.descrizione || v.prezzo }));
+    else if (catMat === 'e-commerce') aggiornati.prodotti = elencoVoci.map((v) => ({ nome: v.nome, prezzo: v.prezzo, descrizione: v.descrizione }));
+  }
   if (foto.length) aggiornati.foto = [...(Array.isArray(attuali.foto) ? attuali.foto : []), ...foto].slice(0, 12);
   if (logo) aggiornati.logo = logo;
   db.prepare('UPDATE siti SET contenuti_json = ?, lavorazione = ? WHERE id = ?')
@@ -991,6 +1116,12 @@ sitiApi.post('/:id/materiali', richiedeAuth, (req, res) => {
     .run(sito.id, req.utente.id, JSON.stringify({
       campi: campiTesto,
       elenco_testo: typeof body.elenco_testo === 'string' ? body.elenco_testo.slice(0, 20000) : '',
+      punti_forza: puntiForza,
+      recensioni_testo: typeof body.recensioni_testo === 'string' ? body.recensioni_testo.slice(0, 10000) : '',
+      faq_testo: typeof body.faq_testo === 'string' ? body.faq_testo.slice(0, 10000) : '',
+      whatsapp: typeof body.whatsapp === 'string' ? body.whatsapp.slice(0, 40) : '',
+      instagram: typeof body.instagram === 'string' ? body.instagram.slice(0, 200) : '',
+      facebook: typeof body.facebook === 'string' ? body.facebook.slice(0, 200) : '',
       note: typeof body.note === 'string' ? body.note.slice(0, 5000) : '',
       foto,
       logo,

@@ -2009,6 +2009,9 @@
     var c = sito.contenuti || {};
     var el = ELENCO_LABEL[sito.categoria] || ELENCO_LABEL['attivita-locale'];
     var fotoEsistenti = Array.isArray(c.foto) ? c.foto : [];
+    var puntiTesto = Array.isArray(c.punti_forza) ? c.punti_forza.join('\n') : '';
+    var recensioniTesto = Array.isArray(c.recensioni) ? c.recensioni.map(function (r) { return (r.nome || '') + ' — ' + (r.testo || ''); }).join('\n') : '';
+    var faqTesto = Array.isArray(c.faq) ? c.faq.map(function (f) { return (f.domanda || f.d || '') + ' — ' + (f.risposta || f.r || ''); }).join('\n') : '';
     return '' +
     '<div class="svm-card" data-sito="' + sito.id + '">' +
       '<div class="svm-card-head">' +
@@ -2031,7 +2034,15 @@
           '<label>Indirizzo<input name="indirizzo" value="' + esc(val(c.indirizzo)) + '" placeholder="Via …, città"></label>' +
           '<label>Orari<input name="orari" value="' + esc(val(c.orari)) + '" placeholder="Lun–Sab 9:00–19:00"></label>' +
         '</div>' +
+        '<div class="svm-2col">' +
+          '<label>Numero WhatsApp<input name="whatsapp" value="' + esc(val(c.whatsapp)) + '" placeholder="+39 3… (pulsante sul sito)"></label>' +
+          '<label>Instagram<input name="instagram" value="' + esc(c.social && c.social.instagram ? c.social.instagram : '') + '" placeholder="@iltuoprofilo o link"></label>' +
+        '</div>' +
+        '<label>Facebook<input name="facebook" value="' + esc(c.social && c.social.facebook ? c.social.facebook : '') + '" placeholder="Link alla tua pagina Facebook"></label>' +
+        '<label>Tre motivi per sceglierti (uno per riga)<textarea name="punti_forza" rows="3" placeholder="Ingredienti freschi ogni mattina&#10;Dal 1998 nel quartiere&#10;Consegna a domicilio gratuita">' + esc(puntiTesto) + '</textarea></label>' +
         '<label>' + esc(el[0]) + '<textarea name="elenco_testo" rows="5" placeholder="' + esc(el[1]) + '"></textarea></label>' +
+        '<label>Recensioni dei tuoi clienti (una per riga: Nome — cosa ha detto)<textarea name="recensioni_testo" rows="3" placeholder="Marco — Cibo buonissimo e personale gentile">' + esc(recensioniTesto) + '</textarea></label>' +
+        '<label>Domande frequenti (una per riga: Domanda? — Risposta)<textarea name="faq_testo" rows="3" placeholder="Fate consegna a domicilio? — Sì, entro 5 km">' + esc(faqTesto) + '</textarea></label>' +
         '<label>Le tue foto (il locale, i piatti, il team…)<input type="file" name="foto" accept="image/*" multiple></label>' +
         (fotoEsistenti.length ? '<div class="svm-foto-ok">' + fotoEsistenti.map(function (f) {
           return '<img src="' + API + esc(f) + '" alt="">';
@@ -2057,9 +2068,12 @@
         msg.hidden = true;
 
         var dati = {};
-        ['nome_attivita', 'tagline', 'descrizione', 'telefono', 'email', 'indirizzo', 'orari']
+        ['nome_attivita', 'tagline', 'descrizione', 'telefono', 'email', 'indirizzo', 'orari', 'whatsapp', 'instagram', 'facebook']
           .forEach(function (k) { dati[k] = form.elements[k].value.trim(); });
         dati.elenco_testo = form.elements.elenco_testo.value;
+        dati.punti_forza = form.elements.punti_forza.value;
+        dati.recensioni_testo = form.elements.recensioni_testo.value;
+        dati.faq_testo = form.elements.faq_testo.value;
         dati.note = form.elements.note.value;
 
         var fotoFiles = Array.prototype.slice.call(form.elements.foto.files || []).slice(0, 8);
@@ -2094,6 +2108,20 @@
     if (!ordini.length) return '<div class="svm-admin"><h3>Pannello Sitevaro — Ordini</h3><p class="svm-sub">Nessun ordine per ora.</p></div>';
     var cards = ordini.map(function (o) {
       var m = o.materiali;
+      var c = o.contenuti || {};
+      var vociAdmin = c.piatti || c.servizi || c.prodotti || c.progetti || [];
+      var elencoAdmin = vociAdmin.map(function (v) {
+        var parti = [v.nome || v.titolo || ''];
+        if (v.prezzo) parti.push(v.prezzo);
+        if (v.descrizione) parti.push(v.descrizione);
+        return parti.join(' — ');
+      }).join('\n');
+      var puntiAdmin = Array.isArray(c.punti_forza) ? c.punti_forza.join('\n') : '';
+      var fotoAdmin = (Array.isArray(c.foto) ? c.foto : []).map(function (f, i) {
+        return '<span><img src="' + API + esc(f) + '" alt="" style="width:74px;height:56px;object-fit:cover;border-radius:8px;display:block">' +
+          '<span style="display:flex;gap:.25rem;margin-top:.3rem"><button type="button" class="svm-btn svm-foto-cover" data-idx="' + i + '" style="padding:.25rem .5rem;font-size:.72rem"' + (i === 0 ? ' disabled' : '') + '>' + (i === 0 ? '★ Copertina' : '★ Fa copertina') + '</button>' +
+          '<button type="button" class="svm-btn svm-foto-del" data-idx="' + i + '" style="padding:.25rem .5rem;font-size:.72rem;background:#b3261e">Togli</button></span></span>';
+      }).join('');
       var campi = m && m.campi ? Object.keys(m.campi).map(function (k) {
         return '<div><strong>' + esc(k) + ':</strong> ' + esc(m.campi[k]) + '</div>';
       }).join('') : '';
@@ -2104,7 +2132,7 @@
       var stati = Object.keys(STATI).map(function (s) {
         return '<option value="' + s + '"' + (o.lavorazione === s ? ' selected' : '') + '>' + STATI[s] + '</option>';
       }).join('');
-      return '<div class="svm-card svm-ordine" data-sito="' + o.id + '">' +
+      return '<div class="svm-card svm-ordine" data-sito="' + o.id + '" data-categoria="' + esc(o.categoria || '') + '">' +
         '<div class="svm-card-head"><div><strong>' + esc(o.email_cliente) + '</strong>' +
         '<div class="svm-sub">' + esc(o.template_nome) + ' · ' + esc((o.created_at || '').slice(0, 10)) + '</div></div>' +
         '<a class="svm-link" href="' + API + esc(o.url) + '" target="_blank" rel="noopener">Vedi sito</a></div>' +
@@ -2114,6 +2142,20 @@
           (m.note ? '<div><strong>Note:</strong> ' + esc(m.note) + '</div>' : '') + foto + '</div>'
           : '<p class="svm-sub">Materiali non ancora inviati.</p>') +
         '<label class="svm-stato">Stato di lavorazione <select class="svm-stato-sel">' + stati + '</select></label>' +
+        '<details style="margin:.8rem 0"><summary style="cursor:pointer;font-weight:600">Modifica testi e foto (senza codice)</summary>' +
+        '<div style="margin-top:.8rem">' +
+          '<label>Nome attività<input type="text" class="svm-ed-nome" value="' + esc(c.nome_attivita || '') + '"></label>' +
+          '<label>Frase di copertina<input type="text" class="svm-ed-tagline" value="' + esc(c.tagline || '') + '"></label>' +
+          '<label>Descrizione<textarea class="svm-ed-descrizione" rows="3">' + esc(c.descrizione || '') + '</textarea></label>' +
+          '<div class="svm-2col"><label>Telefono<input type="text" class="svm-ed-telefono" value="' + esc(c.telefono || '') + '"></label>' +
+          '<label>Email<input type="text" class="svm-ed-email" value="' + esc(c.email || '') + '"></label></div>' +
+          '<div class="svm-2col"><label>Indirizzo<input type="text" class="svm-ed-indirizzo" value="' + esc(c.indirizzo || '') + '"></label>' +
+          '<label>Orari<input type="text" class="svm-ed-orari" value="' + esc(c.orari || '') + '"></label></div>' +
+          '<label>Motivi per sceglierlo (uno per riga, massimo 3)<textarea class="svm-ed-punti" rows="3">' + esc(puntiAdmin) + '</textarea></label>' +
+          '<label>Menu / servizi / progetti / prodotti (una riga: Nome — €prezzo — descrizione)<textarea class="svm-ed-elenco" rows="5">' + esc(elencoAdmin) + '</textarea></label>' +
+          (fotoAdmin ? '<div style="margin:.6rem 0"><div class="svm-sub">Foto del sito: la prima è la copertina grande in alto</div><div style="display:flex;gap:.7rem;flex-wrap:wrap">' + fotoAdmin + '</div></div>' : '') +
+          '<div class="svm-row"><button class="svm-btn svm-salva-testi" type="button">Salva testi</button></div>' +
+        '</div></details>' +
         '<label>Contenuti del sito (JSON)<textarea class="svm-contenuti" rows="8">' +
           esc(JSON.stringify(o.contenuti || {}, null, 2)) + '</textarea></label>' +
         '<label>Dominio del cliente <input type="text" class="svm-dominio" placeholder="www.ristorantedagino.it" value="' + esc(o.dominio || '') + '"></label>' +
@@ -2158,6 +2200,59 @@
         }).then(function (d) {
           esito(true, d.dominio ? 'Dominio collegato: ' + d.dominio : 'Dominio scollegato.');
         }).catch(function (e) { esito(false, e.message); });
+      });
+      var btnTesti = card.querySelector('.svm-salva-testi');
+      if (btnTesti) btnTesti.addEventListener('click', function () {
+        var prendi = function (sel) { var el = card.querySelector(sel); return el ? el.value.trim() : ''; };
+        var punti = prendi('.svm-ed-punti').split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 3);
+        var voci = prendi('.svm-ed-elenco').split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 40).map(function (riga) {
+          var parti = riga.split(/\s+[—–|]\s+|\s+-\s+/).map(function (p) { return p.trim(); }).filter(Boolean);
+          var prezzo = '', descrizione = '';
+          for (var i = 1; i < parti.length; i++) {
+            if (!prezzo && /€/.test(parti[i])) prezzo = parti[i];
+            else descrizione = descrizione ? descrizione + ' — ' + parti[i] : parti[i];
+          }
+          return { nome: parti[0] || '', prezzo: prezzo, descrizione: descrizione };
+        }).filter(function (v) { return v.nome; });
+        var obj = {
+          nome_attivita: prendi('.svm-ed-nome'), tagline: prendi('.svm-ed-tagline'),
+          descrizione: prendi('.svm-ed-descrizione'), telefono: prendi('.svm-ed-telefono'),
+          email: prendi('.svm-ed-email'), indirizzo: prendi('.svm-ed-indirizzo'),
+          orari: prendi('.svm-ed-orari'), punti_forza: punti
+        };
+        var cat = card.getAttribute('data-categoria');
+        if (cat === 'ristorante') obj.piatti = voci;
+        else if (cat === 'attivita-locale') obj.servizi = voci.map(function (v) { return { nome: v.nome, descrizione: v.descrizione || v.prezzo }; });
+        else if (cat === 'freelance-portfolio') obj.progetti = voci.map(function (v) { return { titolo: v.nome, descrizione: v.descrizione || v.prezzo }; });
+        else if (cat === 'e-commerce') obj.prodotti = voci;
+        api('/api/admin/siti/' + id + '/contenuti', { method: 'PUT', body: JSON.stringify(obj) })
+          .then(function () { esito(true, 'Testi salvati: il sito è aggiornato.'); })
+          .catch(function (e) { esito(false, e.message); });
+      });
+      function aggiornaFoto(nuove, testoOk) {
+        api('/api/admin/siti/' + id + '/contenuti', { method: 'PUT', body: JSON.stringify({ foto: nuove }) })
+          .then(function () {
+            var ta = card.querySelector('.svm-contenuti');
+            try { var cc = JSON.parse(ta.value); cc.foto = nuove; ta.value = JSON.stringify(cc, null, 2); } catch (e) {}
+            esito(true, testoOk);
+            setTimeout(render, 600);
+          })
+          .catch(function (e) { esito(false, e.message); });
+      }
+      Array.prototype.forEach.call(card.querySelectorAll('.svm-foto-cover, .svm-foto-del'), function (btn) {
+        btn.addEventListener('click', function () {
+          var idx = parseInt(btn.getAttribute('data-idx'), 10);
+          var fotoCorrenti = [];
+          try { fotoCorrenti = JSON.parse(card.querySelector('.svm-contenuti').value).foto || []; } catch (e) {}
+          if (!fotoCorrenti.length || idx < 0 || idx >= fotoCorrenti.length) { esito(false, 'Foto non trovate: ricarica il pannello.'); return; }
+          if (btn.classList.contains('svm-foto-del')) {
+            aggiornaFoto(fotoCorrenti.filter(function (_, i) { return i !== idx; }), 'Foto rimossa dal sito.');
+          } else if (idx > 0) {
+            var nuove = fotoCorrenti.slice();
+            nuove.unshift(nuove.splice(idx, 1)[0]);
+            aggiornaFoto(nuove, 'Foto impostata come copertina.');
+          }
+        });
       });
     });
   }
