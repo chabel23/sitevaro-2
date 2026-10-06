@@ -104,6 +104,21 @@ CREATE TABLE IF NOT EXISTS materiali (
 );
 CREATE INDEX IF NOT EXISTS idx_materiali_sito ON materiali(sito_id);
 
+-- Richieste di generazione sito (nuovo modello senza vetrina template):
+-- il cliente racconta la sua attività con tanti dati e foto, paga, e
+-- Sitevaro genera il sito entro 24-48 ore assegnando un design libero.
+CREATE TABLE IF NOT EXISTS richieste (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  utente_id INTEGER NOT NULL REFERENCES utenti(id),
+  categoria TEXT NOT NULL,
+  dati_json TEXT NOT NULL DEFAULT '{}',
+  foto_json TEXT NOT NULL DEFAULT '[]',
+  stato TEXT NOT NULL DEFAULT 'in-attesa-pagamento',
+  sito_id INTEGER REFERENCES siti(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_richieste_utente ON richieste(utente_id);
+
 CREATE TABLE IF NOT EXISTS messaggi (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   utente_id INTEGER NOT NULL REFERENCES utenti(id),
@@ -775,6 +790,95 @@ function contenutiDefault(categoria) {
 }
 
 /**
+ * Costruisce i contenuti del sito dai dati ricchi della richiesta:
+ * stessi parser del modulo materiali (elenchi scritti in chiaro che
+ * diventano voci vere del menu/servizi/progetti/prodotti).
+ */
+function contenutiDaRichiesta(richiesta) {
+  const dati = JSON.parse(richiesta.dati_json || '{}');
+  const foto = JSON.parse(richiesta.foto_json || '[]');
+  const contenuti = { ...contenutiDefault(richiesta.categoria), ...(dati.campi || {}) };
+  if (foto.length) contenuti.foto = foto.slice(0, 12);
+  if (dati.logo) contenuti.logo = dati.logo;
+  if (Array.isArray(dati.punti_forza) && dati.punti_forza.length) contenuti.punti_forza = dati.punti_forza;
+  if (Array.isArray(dati.recensioni) && dati.recensioni.length) contenuti.recensioni = dati.recensioni;
+  if (Array.isArray(dati.faq) && dati.faq.length) contenuti.faq = dati.faq;
+  if (dati.whatsapp) contenuti.whatsapp = dati.whatsapp;
+  if (dati.social && Object.keys(dati.social).length) contenuti.social = dati.social;
+  const voci = Array.isArray(dati.voci) ? dati.voci : [];
+  if (voci.length) {
+    if (richiesta.categoria === 'ristorante') contenuti.piatti = voci;
+    else if (richiesta.categoria === 'attivita-locale') contenuti.servizi = voci.map((v) => ({ nome: v.nome, descrizione: v.descrizione || v.prezzo }));
+    else if (richiesta.categoria === 'freelance-portfolio') contenuti.progetti = voci.map((v) => ({ titolo: v.nome, descrizione: v.descrizione || v.prezzo }));
+    else if (richiesta.categoria === 'e-commerce') contenuti.prodotti = voci;
+  }
+  return contenuti;
+}
+
+/**
+ * Pagamento completato per una richiesta (nuovo modello senza template
+ * scelti dal cliente): assegna il primo design libero della categoria
+ * (resta esclusivo per quel cliente), crea sito e abbonamento con i
+ * contenuti già compilati dai dati del cliente e salva i materiali per
+ * il pannello operatore. Idempotente come l'altro percorso.
+ */
+function creaSitoDaRichiesta(session) {
+  const metadata = session.metadata || {};
+  const userId = Number(metadata.userId);
+  const richiestaId = Number(metadata.richiestaId);
+  const subscriptionId = session.subscription || null;
+  const priceId = metadata.priceId || null;
+
+  if (subscriptionId) {
+    const gia = db.prepare('SELECT * FROM siti WHERE stripe_subscription_id = ?').get(subscriptionId);
+    if (gia) return gia;
+  }
+  const richiesta = db.prepare('SELECT * FROM richieste WHERE id = ?').get(richiestaId);
+  if (!richiesta || richiesta.utente_id !== userId) throw new Error('Richiesta non trovata per questo pagamento');
+  if (richiesta.sito_id) {
+    const esistente = db.prepare('SELECT * FROM siti WHERE id = ?').get(richiesta.sito_id);
+    if (esistente) return esistente;
+  }
+  const template = db.prepare('SELECT * FROM template WHERE categoria = ? AND riservato = 0 ORDER BY id LIMIT 1').get(richiesta.categoria);
+  if (!template) throw new Error('Nessun design libero per la categoria ' + richiesta.categoria);
+
+  const contenuti = contenutiDaRichiesta(richiesta);
+  const slug = generaSlug(contenuti.nome_attivita);
+  const dati = JSON.parse(richiesta.dati_json || '{}');
+
+  const tx = db.transaction(() => {
+    db.prepare('UPDATE template SET riservato = 1, reserved_by = ? WHERE id = ?').run(userId, template.id);
+    const info = db.prepare(`
+      INSERT INTO siti (slug, utente_id, template_id, stripe_subscription_id, stato, contenuti_json, lavorazione)
+      VALUES (?, ?, ?, ?, 'attivo', ?, 'in-lavorazione')
+    `).run(slug, userId, template.id, subscriptionId, JSON.stringify(contenuti));
+    db.prepare(`
+      INSERT INTO abbonamenti (utente_id, stripe_subscription_id, price_id, stato)
+      VALUES (?, ?, ?, 'attivo')
+      ON CONFLICT(stripe_subscription_id) DO UPDATE SET stato = 'attivo', price_id = excluded.price_id
+    `).run(userId, subscriptionId, priceId);
+    db.prepare('INSERT INTO materiali (sito_id, utente_id, dati_json) VALUES (?, ?, ?)')
+      .run(info.lastInsertRowid, userId, JSON.stringify({
+        campi: dati.campi || {},
+        elenco_testo: dati.elenco_testo || '',
+        punti_forza: dati.punti_forza || [],
+        recensioni_testo: dati.recensioni_testo || '',
+        faq_testo: dati.faq_testo || '',
+        whatsapp: dati.whatsapp || '',
+        instagram: (dati.social || {}).instagram || '',
+        facebook: (dati.social || {}).facebook || '',
+        stile: dati.stile || '',
+        note: dati.note || '',
+        foto: JSON.parse(richiesta.foto_json || '[]'),
+        logo: dati.logo || null,
+      }));
+    db.prepare("UPDATE richieste SET stato = 'pagata', sito_id = ? WHERE id = ?").run(info.lastInsertRowid, richiesta.id);
+    return db.prepare('SELECT * FROM siti WHERE id = ?').get(info.lastInsertRowid);
+  });
+  return tx();
+}
+
+/**
  * Gestisce checkout.session.completed.
  * session = { metadata: { userId, templateId, priceId? }, subscription, customer }
  * Ritorna il sito creato. Idempotente: se esiste già un sito con la stessa
@@ -782,6 +886,7 @@ function contenutiDefault(categoria) {
  */
 function handleCheckoutCompleted(session) {
   const metadata = session.metadata || {};
+  if (metadata.richiestaId) return creaSitoDaRichiesta(session);
   const userId = Number(metadata.userId);
   const templateId = metadata.templateId;
   const subscriptionId = session.subscription || null;
@@ -1034,18 +1139,31 @@ checkoutRoutes.get('/piani', (req, res) => {
   res.json({ piani: Object.entries(PREZZI).map(([priceId, info]) => ({ priceId, ...info })) });
 });
 
-// POST /api/checkout { priceId, templateId } → { url }
+// POST /api/checkout { priceId, richiestaId } → { url }
+// Nuovo modello: il cliente ha già raccontato la sua attività con la
+// richiesta; al pagamento Sitevaro gli assegna un design libero e genera
+// il sito. Il vecchio percorso con templateId resta accettato per
+// compatibilità ma la vetrina non lo usa più.
 checkoutRoutes.post('/', richiedeAuth, async (req, res) => {
-  const { priceId, templateId } = req.body || {};
+  const { priceId, templateId, richiestaId } = req.body || {};
 
   if (!priceId || !PREZZI[priceId]) {
     return res.status(400).json({ errore: 'Piano non valido' });
   }
-  if (!templateId) return res.status(400).json({ errore: 'templateId obbligatorio' });
 
-  const template = db.prepare('SELECT id, riservato FROM template WHERE id = ?').get(templateId);
-  if (!template) return res.status(404).json({ errore: 'Template non trovato' });
-  if (template.riservato) return res.status(409).json({ errore: 'Template già riservato da un altro cliente' });
+  let metadata = null;
+  if (richiestaId) {
+    const ric = db.prepare('SELECT * FROM richieste WHERE id = ?').get(Number(richiestaId));
+    if (!ric || ric.utente_id !== req.utente.id) return res.status(404).json({ errore: 'Richiesta non trovata' });
+    if (ric.stato !== 'in-attesa-pagamento') return res.status(409).json({ errore: 'Questa richiesta è già stata pagata' });
+    metadata = { userId: String(req.utente.id), richiestaId: String(ric.id), priceId };
+  } else {
+    if (!templateId) return res.status(400).json({ errore: 'templateId obbligatorio' });
+    const template = db.prepare('SELECT id, riservato FROM template WHERE id = ?').get(templateId);
+    if (!template) return res.status(404).json({ errore: 'Template non trovato' });
+    if (template.riservato) return res.status(409).json({ errore: 'Template già riservato da un altro cliente' });
+    metadata = { userId: String(req.utente.id), templateId, priceId };
+  }
 
   const stripe = stripeClient();
   if (!stripe) {
@@ -1060,7 +1178,7 @@ checkoutRoutes.post('/', richiedeAuth, async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
-      metadata: { userId: String(req.utente.id), templateId, priceId },
+      metadata,
       success_url: `${baseUrl}/checkout/successo?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/checkout/annullato`,
     });
@@ -1075,8 +1193,8 @@ checkoutRoutes.post('/', richiedeAuth, async (req, res) => {
 checkoutRoutes.get('/successo', (req, res) => {
   res.send(`<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pagamento completato — Sitevaro</title></head>
 <body style="font-family:system-ui,sans-serif;text-align:center;padding:4rem 1rem">
-<h1>🎉 Pagamento completato!</h1><p>Il tuo sito Sitevaro è in preparazione e sarà online tra pochi minuti.</p>
-<p>Riceverai il link del tuo sito via email.</p></body></html>`);
+<h1>🎉 Pagamento completato!</h1><p>Abbiamo ricevuto i tuoi dati: generiamo il tuo sito entro 24-48 ore.</p>
+<p>Lo trovi nella tua Area cliente su Sitevaro appena è online.</p></body></html>`);
 });
 
 checkoutRoutes.get('/annullato', (req, res) => {
@@ -1323,6 +1441,87 @@ sitiPubblico.get('/s/:slug', (req, res) => {
   res.send(renderSito({ sito, template: sito, contenuti: JSON.parse(sito.contenuti_json || '{}') }));
 });
 
+/* ---- 8.5b Richieste di generazione (nuovo modello senza template) ------ */
+/* Il cliente racconta la sua attività con tanti dati e foto PRIMA di
+ * pagare: la richiesta resta salvata nel suo account, poi sceglie il
+ * piano e il sito viene generato (vedi creaSitoDaRichiesta).            */
+
+const richiesteRoutes = express.Router();
+
+// POST /api/richieste — salva la richiesta ricca del cliente
+richiesteRoutes.post('/', richiedeAuth, (req, res) => {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const categoria = String(body.categoria || '');
+  if (!CATEGORIE.includes(categoria)) return res.status(400).json({ errore: 'Categoria non valida' });
+
+  const campi = {};
+  for (const k of ['nome_attivita', 'tagline', 'descrizione', 'telefono', 'email', 'indirizzo', 'orari', 'ruolo', 'bio']) {
+    if (typeof body[k] === 'string' && body[k].trim()) campi[k] = body[k].trim().slice(0, 2000);
+  }
+  if (!campi.nome_attivita) return res.status(400).json({ errore: 'Dicci il nome della tua attività' });
+
+  const salvaImmagineRich = (img, prefisso) => {
+    if (!img || typeof img.dati !== 'string') return null;
+    const base64 = img.dati.includes(',') ? img.dati.split(',').pop() : img.dati;
+    let buf;
+    try { buf = Buffer.from(base64, 'base64'); } catch (e) { return null; }
+    if (buf.length < 1024 || buf.length > 8 * 1024 * 1024) return null;
+    const tipo = (img.tipo || '').toLowerCase();
+    const est = tipo.includes('png') ? 'png' : tipo.includes('webp') ? 'webp' : 'jpg';
+    const nomeFile = `${prefisso}-${req.utente.id}-${crypto.randomBytes(8).toString('hex')}.${est}`;
+    fs.writeFileSync(path.join(UPLOAD_DIR, nomeFile), buf);
+    return `/uploads/${nomeFile}`;
+  };
+
+  const foto = [];
+  if (Array.isArray(body.foto)) {
+    for (const img of body.foto.slice(0, 10)) {
+      const url = salvaImmagineRich(img, 'foto');
+      if (url) foto.push(url);
+    }
+  }
+  const logo = salvaImmagineRich(body.logo, 'logo');
+
+  const social = {};
+  if (typeof body.instagram === 'string' && body.instagram.trim()) social.instagram = body.instagram.trim().slice(0, 200);
+  if (typeof body.facebook === 'string' && body.facebook.trim()) social.facebook = body.facebook.trim().slice(0, 200);
+
+  const dati = {
+    campi,
+    elenco_testo: typeof body.elenco_testo === 'string' ? body.elenco_testo.slice(0, 20000) : '',
+    voci: parseElencoRighe(body.elenco_testo),
+    punti_forza: parsePuntiForza(body.punti_forza),
+    recensioni: parseRecensioni(body.recensioni_testo),
+    recensioni_testo: typeof body.recensioni_testo === 'string' ? body.recensioni_testo.slice(0, 10000) : '',
+    faq: parseFaq(body.faq_testo),
+    faq_testo: typeof body.faq_testo === 'string' ? body.faq_testo.slice(0, 10000) : '',
+    whatsapp: typeof body.whatsapp === 'string' ? body.whatsapp.trim().slice(0, 40) : '',
+    social,
+    stile: typeof body.stile === 'string' ? body.stile.slice(0, 500) : '',
+    note: typeof body.note === 'string' ? body.note.slice(0, 5000) : '',
+    logo,
+  };
+
+  const info = db.prepare('INSERT INTO richieste (utente_id, categoria, dati_json, foto_json) VALUES (?, ?, ?, ?)')
+    .run(req.utente.id, categoria, JSON.stringify(dati), JSON.stringify(foto));
+  res.status(201).json({ id: info.lastInsertRowid, stato: 'in-attesa-pagamento', foto });
+});
+
+// GET /api/richieste/mie — le richieste del cliente (per riprendere il
+// pagamento dopo l'accesso e vedere lo stato di generazione)
+richiesteRoutes.get('/mie', richiedeAuth, (req, res) => {
+  const rows = db.prepare('SELECT id, categoria, stato, sito_id, created_at, dati_json FROM richieste WHERE utente_id = ? ORDER BY id DESC LIMIT 10').all(req.utente.id);
+  res.json({
+    richieste: rows.map((r) => {
+      const dati = JSON.parse(r.dati_json || '{}');
+      return {
+        id: r.id, categoria: r.categoria, stato: r.stato, sito_id: r.sito_id,
+        created_at: r.created_at, nome_attivita: (dati.campi || {}).nome_attivita || '',
+      };
+    }),
+  });
+});
+
 /* ---- 8.6 Admin (equivalente di src/routes/admin.js) -------------------- */
 
 const adminRoutes = express.Router();
@@ -1392,6 +1591,33 @@ adminRoutes.patch('/siti/:id/dominio', richiedeAuth, richiedeAdmin, (req, res) =
   db.prepare('UPDATE siti SET dominio = ? WHERE id = ?').run(dominio || null, sito.id);
   res.json({ ok: true, dominio: dominio || null });
 });
+// GET /api/admin/template-liberi?categoria= — design ancora liberi di una
+// categoria, per assegnare o cambiare il design di un sito generato.
+adminRoutes.get('/template-liberi', richiedeAuth, richiedeAdmin, (req, res) => {
+  const categoria = String(req.query.categoria || '');
+  if (!CATEGORIE.includes(categoria)) return res.status(400).json({ errore: 'Categoria non valida' });
+  const rows = db.prepare('SELECT id, nome, layout, font FROM template WHERE categoria = ? AND riservato = 0 ORDER BY id LIMIT 300').all(categoria);
+  res.json({ template: rows });
+});
+
+// PATCH /api/admin/siti/:id/design { templateId } — cambia il design del
+// sito: il vecchio torna libero, il nuovo diventa esclusivo del cliente.
+adminRoutes.patch('/siti/:id/design', richiedeAuth, richiedeAdmin, (req, res) => {
+  const sito = db.prepare('SELECT * FROM siti WHERE id = ?').get(req.params.id);
+  if (!sito) return res.status(404).json({ errore: 'Sito non trovato' });
+  const nuovo = db.prepare('SELECT * FROM template WHERE id = ?').get(String((req.body || {}).templateId || ''));
+  if (!nuovo) return res.status(404).json({ errore: 'Design non trovato' });
+  if (nuovo.id === sito.template_id) return res.json({ ok: true, template_id: nuovo.id, nome: nuovo.nome });
+  if (nuovo.riservato) return res.status(409).json({ errore: 'Design già assegnato a un altro cliente' });
+  const tx = db.transaction(() => {
+    db.prepare('UPDATE template SET riservato = 0, reserved_by = NULL WHERE id = ?').run(sito.template_id);
+    db.prepare('UPDATE template SET riservato = 1, reserved_by = ? WHERE id = ?').run(sito.utente_id, nuovo.id);
+    db.prepare('UPDATE siti SET template_id = ? WHERE id = ?').run(nuovo.id, sito.id);
+  });
+  tx();
+  res.json({ ok: true, template_id: nuovo.id, nome: nuovo.nome });
+});
+
 adminRoutes.put('/siti/:id/contenuti', richiedeAuth, richiedeAdmin, (req, res) => {
   const sito = db.prepare('SELECT * FROM siti WHERE id = ?').get(req.params.id);
   if (!sito) return res.status(404).json({ errore: 'Sito non trovato' });
@@ -1615,6 +1841,7 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/checkout', checkoutRoutes);
+app.use('/api/richieste', express.json({ limit: '30mb' }), richiesteRoutes);
 app.use('/api/sites', sitiApi);
 app.use('/api/admin', adminRoutes);
 app.use('/api/account', accountRoutes);
