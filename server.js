@@ -355,70 +355,193 @@ const CTA_SITO = {
   'e-commerce': ['Scopri i prodotti', '#servizi'],
 };
 
-// Intestazione di sezione con etichetta e filetto colorato (stile agenzia).
-function intestazione(eyebrow, titolo) {
-  return `<p class="sv-eyebrow">${esc(eyebrow)}</p><h2>${esc(titolo)}</h2><div class="sv-linea"></div>`;
+// Ogni nome di layout appartiene a una "famiglia" visiva: è la famiglia a
+// decidere geometria dell'apertura, ordine delle sezioni e dettagli, così
+// due template diversi sembrano siti progettati da studi diversi.
+function famigliaLayout(layout) {
+  const l = String(layout || '');
+  if (l.includes('fullscreen')) return 'schermo';
+  if (l.includes('minimal')) return 'minimale';
+  if (['hero-split', 'hero-personale', 'storia-e-foto', 'chi-siamo-storia', 'lookbook', 'serata-eventi', 'blog-evidenza'].includes(l)) return 'editoriale';
+  if (['prenota-subito', 'prenota-online', 'contatto-diretto', 'checkout-semplice', 'menu-in-evidenza', 'hero-mappa', 'orari-e-contatti'].includes(l)) return 'azione';
+  if (['griglia-piatti', 'servizi-griglia', 'portfolio-griglia', 'portfolio-masonry', 'griglia-prodotti', 'categorie-shop', 'offerte-lampo', 'galleria-lavori', 'vetrina-hero'].includes(l)) return 'vetrina';
+  if (['lista-menu-elegante', 'servizi-lista', 'servizi-e-prezzi', 'cv-timeline'].includes(l)) return 'elegante';
+  if (['recensioni-evidenza', 'testimonianze', 'recensioni-prodotti'].includes(l)) return 'prova';
+  return 'centrato';
 }
 
-function hero(contenuti, palette, layout, fotoHero, categoria) {
+// Intestazione di sezione numerata (01 · 02 · 03), stile editoriale.
+function intestazione(numero, eyebrow, titolo) {
+  return `<div style="display:flex;align-items:baseline;gap:1rem"><span style="font-size:.8rem;font-weight:700;letter-spacing:.14em;color:inherit;opacity:.55">${String(numero).padStart(2, '0')}</span><p class="sv-eyebrow">${esc(eyebrow)}</p></div><h2>${esc(titolo)}</h2><div class="sv-linea"></div>`;
+}
+
+// L'apertura del sito cambia davvero da famiglia a famiglia: foto a tutto
+// schermo con titolo gigante, taglio editoriale da rivista, pannello di
+// prenotazione, citazione con le stelle, lista elegante o minimal estremo.
+function hero(contenuti, palette, layout, foto, categoria) {
+  const famiglia = famigliaLayout(layout);
   const titolo = esc(contenuti.nome_attivita);
   const tagline = esc(contenuti.tagline);
+  const fotoHero = foto[0] || '';
   const ctaCfg = CTA_SITO[categoria] || CTA_SITO['attivita-locale'];
   const ctaHref = ctaCfg[1] === 'tel' ? `tel:${esc(contenuti.telefono)}`
     : ctaCfg[1] === 'mail' ? `mailto:${esc(contenuti.email)}` : ctaCfg[1];
   const secLabel = { 'ristorante': 'il menu', 'attivita-locale': 'i servizi', 'freelance-portfolio': 'i progetti', 'e-commerce': 'i contatti' }[categoria] || 'i servizi';
   const secHref = categoria === 'e-commerce' ? '#contatti' : '#servizi';
-  const bottoni = `<div style="display:flex;gap:.9rem;flex-wrap:wrap;margin-top:1.9rem">
-    <a class="sv-btn" href="${ctaHref}" style="${stilePulsante(palette)};padding:1rem 2rem;font-size:1.02rem;box-shadow:0 10px 24px rgba(0,0,0,.18)">${ctaCfg[0]}</a>
-    <a class="sv-btn" href="${secHref}" style="${stilePulsante(palette)};background:rgba(255,255,255,.14);color:inherit;border:2px solid currentColor;box-shadow:none">Vedi ${secLabel}</a></div>`;
-  const eyebrow = `<p style="font-size:.78rem;font-weight:700;letter-spacing:.24em;text-transform:uppercase;opacity:.75;margin:0 0 1rem">${esc(NOMI_CATEGORIE[categoria] || '')}</p>`;
-  if (layout.includes('fullscreen')) {
-    return `<section id="home" style="min-height:82vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;background:linear-gradient(rgba(10,15,12,.48),rgba(10,15,12,.65)),url('${esc(fotoHero)}') center/cover,linear-gradient(135deg,${palette.primaria},${palette.secondaria});color:#fff;padding:5rem 1.5rem">
-      ${eyebrow}<h1 style="font-size:clamp(2.5rem,6vw,4.1rem);margin:0 0 1rem;max-width:820px">${titolo}</h1><p style="font-size:clamp(1.1rem,2.2vw,1.35rem);opacity:.92;max-width:640px;margin:0">${tagline}</p>
-      <div style="display:flex;justify-content:center">${bottoni}</div></section>`;
+  const primario = `<a class="sv-btn" href="${ctaHref}" style="${stilePulsante(palette)};padding:1rem 2rem;font-size:1.02rem;box-shadow:0 10px 24px rgba(0,0,0,.18)">${ctaCfg[0]}</a>`;
+  const secondario = `<a class="sv-btn" href="${secHref}" style="${stilePulsante(palette)};background:rgba(255,255,255,.14);color:inherit;border:2px solid currentColor;box-shadow:none">Vedi ${secLabel}</a>`;
+  const bottoni = `<div style="display:flex;gap:.9rem;flex-wrap:wrap;margin-top:1.9rem">${primario}${secondario}</div>`;
+  const eyebrow = `<p style="font-size:.78rem;font-weight:700;letter-spacing:.26em;text-transform:uppercase;opacity:.75;margin:0 0 1.1rem">${esc(NOMI_CATEGORIE[categoria] || '')}</p>`;
+
+  if (famiglia === 'schermo') {
+    const meta = [contenuti.indirizzo, contenuti.orari].filter(Boolean).map((m) => esc(m)).join('&nbsp;&nbsp;·&nbsp;&nbsp;');
+    return `<section id="home" class="rv" style="min-height:94vh;display:flex;flex-direction:column;justify-content:flex-end;background:linear-gradient(rgba(8,12,10,.28),rgba(8,12,10,.78) 78%),url('${esc(fotoHero)}') center/cover,linear-gradient(135deg,${palette.primaria},${palette.secondaria});color:#fff;padding:6.5rem 0 3rem">
+      <div class="sv-wrap" style="width:100%">${eyebrow}
+      <h1 style="font-size:clamp(3rem,8.5vw,5.6rem);margin:0;max-width:900px;line-height:.98">${titolo}</h1>
+      <p style="font-size:clamp(1.12rem,2.3vw,1.45rem);opacity:.94;max-width:620px;margin:1.2rem 0 0">${tagline}</p>
+      ${bottoni}
+      ${meta ? `<p style="margin:2.2rem 0 0;padding-top:1.1rem;border-top:1px solid rgba(255,255,255,.35);font-size:.92rem;opacity:.9">${meta}</p>` : ''}
+      </div></section>`;
   }
-  if (layout.includes('split') || layout.includes('personale')) {
-    return `<section id="home" style="padding:4.5rem 0 3.5rem"><div class="sv-wrap" style="display:flex;flex-wrap:wrap;align-items:center;gap:2.5rem">
-      <div style="flex:1;min-width:280px">${eyebrow}<h1 style="font-size:clamp(2.3rem,5vw,3.4rem);margin:0 0 1rem">${titolo}</h1>
-      <p style="font-size:1.25rem;color:${palette.secondaria};margin:0">${tagline}</p>
-      <p style="margin:1rem 0 0">${esc(contenuti.descrizione)}</p>${bottoni}</div>
-      <div style="flex:1;min-width:280px;border-radius:18px;min-height:340px;background:url('${esc(fotoHero)}') center/cover;box-shadow:0 24px 48px rgba(15,25,20,.22)"></div></div></section>`;
+
+  if (famiglia === 'editoriale') {
+    const seconda = foto[1] || fotoHero;
+    return `<section id="home" class="rv" style="padding:4.8rem 0 3.8rem;overflow:hidden"><div class="sv-wrap">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:2.5rem;align-items:end">
+        <div>${eyebrow}<h1 style="font-size:clamp(2.7rem,6.5vw,4.6rem);margin:0;line-height:1.0">${titolo}</h1>
+        <p style="font-size:1.35rem;color:${palette.secondaria};margin:1.2rem 0 0;max-width:480px">${tagline}</p>${bottoni}</div>
+        <div style="position:relative">
+          <img src="${esc(fotoHero)}" alt="${titolo}" style="width:100%;aspect-ratio:3/3.4;object-fit:cover;border-radius:4px;display:block;box-shadow:0 30px 60px rgba(15,25,20,.25)">
+          <span style="position:absolute;left:-14px;bottom:26px;background:${palette.accento};color:#fff;font-weight:700;font-size:.85rem;padding:.55rem 1rem;border-radius:3px;box-shadow:0 10px 22px rgba(0,0,0,.22)">${esc(NOMI_CATEGORIE[categoria] || '')}</span>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:2.5rem;margin-top:3rem;align-items:start">
+        <p style="font-size:1.12rem;line-height:1.8;margin:0;max-width:560px">${esc(contenuti.descrizione)}</p>
+        <img src="${esc(seconda)}" alt="" loading="lazy" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:4px;display:block">
+      </div>
+    </div></section>`;
   }
-  return `<section id="home" style="text-align:center;padding:4.5rem 0 3.5rem"><div class="sv-wrap">${eyebrow}
-    <h1 style="font-size:clamp(2.4rem,5.5vw,3.6rem);margin:0 0 1rem">${titolo}</h1><p style="font-size:1.25rem;margin:0 auto;max-width:640px">${tagline}</p>
+
+  if (famiglia === 'azione') {
+    const wa = String(contenuti.whatsapp || '').replace(/\D/g, '');
+    return `<section id="home" class="rv" style="padding:4.2rem 0 3.6rem"><div class="sv-wrap" style="display:flex;flex-wrap:wrap;gap:2.5rem;align-items:center">
+      <div style="flex:1.25;min-width:290px">${eyebrow}
+        <h1 style="font-size:clamp(2.5rem,6vw,4.2rem);margin:0;line-height:1.02">${titolo}</h1>
+        <p style="font-size:1.28rem;color:${palette.secondaria};margin:1.1rem 0 0">${tagline}</p>
+        <p style="margin:1rem 0 0;max-width:520px">${esc(contenuti.descrizione)}</p>
+        <p style="margin:1.6rem 0 0"><img src="${esc(fotoHero)}" alt="${titolo}" style="width:100%;aspect-ratio:16/8;object-fit:cover;border-radius:14px;display:block"></p>
+      </div>
+      <aside style="flex:1;min-width:280px;max-width:400px;background:#fff;color:#22262b;border-radius:18px;box-shadow:0 26px 50px rgba(15,25,20,.18);padding:1.9rem">
+        <p style="margin:0;font-size:.75rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:${palette.primaria}">${esc(ctaCfg[0])}</p>
+        <a href="tel:${esc(contenuti.telefono)}" style="display:block;font-family:inherit;font-size:1.65rem;font-weight:700;color:#22262b;text-decoration:none;margin:.7rem 0 .2rem">${esc(contenuti.telefono)}</a>
+        ${contenuti.orari ? `<p style="margin:.5rem 0 0"><strong>Orari</strong><br>${esc(contenuti.orari)}</p>` : ''}
+        ${contenuti.indirizzo ? `<p style="margin:.8rem 0 0"><strong>Dove siamo</strong><br>${esc(contenuti.indirizzo)}</p>` : ''}
+        <p style="margin:1.4rem 0 0"><a class="sv-btn" href="${ctaHref}" style="${stilePulsante(palette)};display:block;text-align:center;padding:1rem">${ctaCfg[0]}</a></p>
+        ${wa ? `<p style="margin:.7rem 0 0"><a class="sv-btn" href="https://wa.me/${wa}" target="_blank" rel="noopener" style="${stilePulsante(palette)};background:#22c064;display:block;text-align:center;padding:1rem">Scrivici su WhatsApp</a></p>` : ''}
+      </aside>
+    </div></section>`;
+  }
+
+  if (famiglia === 'vetrina') {
+    const voci = (contenuti.piatti || contenuti.servizi || contenuti.prodotti || contenuti.progetti || []).slice(0, 4)
+      .map((v) => `<a href="#servizi" style="border:1.5px solid currentColor;border-radius:999px;padding:.45rem 1rem;color:inherit;text-decoration:none;font-weight:600;font-size:.9rem">${esc(v.nome || v.titolo || '')}</a>`).join('');
+    return `<section id="home" class="rv" style="padding:4.5rem 0 3.4rem"><div class="sv-wrap">
+      ${eyebrow}<h1 style="font-size:clamp(2.6rem,6.5vw,4.4rem);margin:0;max-width:840px;line-height:1.0">${titolo}</h1>
+      <p style="font-size:1.3rem;color:${palette.secondaria};margin:1.1rem 0 0;max-width:600px">${tagline}</p>
+      ${bottoni}
+      <img src="${esc(fotoHero)}" alt="${titolo}" style="width:100%;aspect-ratio:16/8.5;object-fit:cover;border-radius:16px;margin-top:2.4rem;display:block;box-shadow:0 24px 48px rgba(15,25,20,.18)">
+      ${voci ? `<div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1.4rem">${voci}</div>` : ''}
+    </div></section>`;
+  }
+
+  if (famiglia === 'prova') {
+    const rec = Array.isArray(contenuti.recensioni) && contenuti.recensioni.length ? contenuti.recensioni[0] : null;
+    return `<section id="home" class="rv" style="padding:4.6rem 0 3.6rem;text-align:center"><div class="sv-wrap">
+      ${eyebrow}<h1 style="font-size:clamp(2.6rem,6.5vw,4.4rem);margin:0 auto;max-width:820px;line-height:1.02">${titolo}</h1>
+      <p style="font-size:1.3rem;color:${palette.secondaria};margin:1.1rem auto 0;max-width:600px">${tagline}</p>
+      ${rec ? `<figure style="max-width:680px;margin:2.4rem auto 0;background:#fff;color:#22262b;border-radius:18px;padding:2rem;box-shadow:0 20px 44px rgba(15,25,20,.13)">
+        <div style="color:${palette.accento};letter-spacing:.3em;font-size:1.15rem" aria-hidden="true">${'★'.repeat(Math.max(1, Math.min(5, rec.stelle || 5)))}</div>
+        <blockquote style="font-size:1.3rem;font-style:italic;line-height:1.55;margin:.9rem 0">“${esc(rec.testo)}”</blockquote>
+        <figcaption style="font-weight:700">${esc(rec.nome)}</figcaption></figure>`
+      : `<p style="font-size:1.5rem;font-style:italic;max-width:640px;margin:2.2rem auto 0">“${tagline}”</p>`}
+      <div style="display:flex;justify-content:center">${bottoni}</div>
+    </div></section>`;
+  }
+
+  if (famiglia === 'elegante') {
+    return `<section id="home" class="rv" style="padding:4.5rem 0 3.5rem"><div class="sv-wrap" style="max-width:860px;text-align:center">
+      ${eyebrow}
+      <div style="border-top:1px solid currentColor;opacity:.9"></div>
+      <h1 style="font-size:clamp(2.7rem,6.5vw,4.3rem);margin:1.6rem 0 .8rem;line-height:1.05">${titolo}</h1>
+      <p style="font-size:1.3rem;font-style:italic;color:${palette.secondaria};margin:0">${tagline}</p>
+      <div style="border-bottom:1px solid currentColor;margin-top:1.6rem"></div>
+      <div style="display:flex;justify-content:center">${bottoni}</div>
+      <img src="${esc(fotoHero)}" alt="${titolo}" style="width:100%;aspect-ratio:16/9;object-fit:cover;margin-top:2.6rem;display:block;border:1px solid rgba(0,0,0,.15);padding:8px;background:#fff">
+    </div></section>`;
+  }
+
+  if (famiglia === 'minimale') {
+    return `<section id="home" class="rv" style="padding:4.5rem 0 3.5rem"><div class="sv-wrap">
+      ${eyebrow}
+      <h1 style="font-size:clamp(3rem,9vw,5.8rem);margin:0;line-height:.95;text-transform:uppercase">${titolo}</h1>
+      <p style="font-size:1.25rem;margin:1.3rem 0 0;max-width:560px">${tagline}</p>
+      ${bottoni}
+      <div style="border-top:2px solid currentColor;margin-top:3rem;padding-top:1rem;display:flex;gap:2rem;flex-wrap:wrap;font-size:.95rem">
+        ${contenuti.indirizzo ? `<span>${esc(contenuti.indirizzo)}</span>` : ''}${contenuti.orari ? `<span>${esc(contenuti.orari)}</span>` : ''}<span>${esc(contenuti.telefono)}</span>
+      </div>
+    </div></section>`;
+  }
+
+  // centrato (predefinito)
+  return `<section id="home" class="rv" style="text-align:center;padding:4.5rem 0 3.5rem"><div class="sv-wrap">${eyebrow}
+    <h1 style="font-size:clamp(2.5rem,6vw,4rem);margin:0 0 1rem">${titolo}</h1><p style="font-size:1.28rem;margin:0 auto;max-width:640px">${tagline}</p>
     <div style="display:flex;justify-content:center">${bottoni}</div>
     <img src="${esc(fotoHero)}" alt="${titolo}" style="width:100%;aspect-ratio:16/8;object-fit:cover;border-radius:18px;margin-top:2.5rem;box-shadow:0 24px 48px rgba(15,25,20,.18)"></div></section>`;
 }
 
-function sezioniCategoria(contenuti, palette, categoria, foto) {
+function sezioniCategoria(contenuti, palette, categoria, foto, numero, famiglia) {
   const immagini = Array.isArray(foto) && foto.length ? foto : [];
+  const TS = '#22262b'; // testo scuro sulle bande bianche (anche con palette scure)
   const griglia = (items) =>
     `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem;margin-top:2rem">${items}</div>`;
-  const cardTesto = (titolo, corpo, extra = '') =>
-    `<div class="sv-card" style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:16px;padding:1.6rem;box-shadow:0 4px 14px rgba(15,25,20,.05)"><h3 style="margin:0 0 .6rem;color:${palette.primaria}">${esc(titolo)}</h3><p style="margin:0">${esc(corpo)}</p>${extra}</div>`;
   const cardFoto = (titolo, corpo, extra, indice) =>
-    `<div class="sv-card" style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:16px;overflow:hidden;box-shadow:0 4px 14px rgba(15,25,20,.05)">
+    `<div class="sv-card" style="background:#fff;color:${TS};border:1px solid rgba(0,0,0,.07);border-radius:16px;overflow:hidden;box-shadow:0 4px 14px rgba(15,25,20,.05)">
       <img src="${esc(immagini[indice % Math.max(immagini.length, 1)] || '')}" alt="" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;display:block">
       <div style="padding:1.25rem 1.5rem 1.5rem"><h3 style="margin:0 0 .5rem;color:${palette.primaria}">${esc(titolo)}</h3><p style="margin:0">${esc(corpo)}</p>${extra}</div></div>`;
+  const menuElegante = (piatti) =>
+    `<div class="sv-menu" style="margin-top:1.6rem">${piatti.map((p) =>
+      `<div class="sv-riga"><div style="flex:1;min-width:0"><strong style="font-size:1.05rem">${esc(p.nome)}</strong><div style="opacity:.72;font-size:.92rem">${esc(p.descrizione)}</div></div><span class="sv-dots"></span><strong style="color:${palette.primaria};white-space:nowrap">${esc(p.prezzo)}</strong></div>`).join('')}</div>`;
 
   if (categoria === 'ristorante' && contenuti.piatti) {
-    // Menu elegante in stile ristorante: nome, puntini, prezzo allineato.
-    return `<section id="servizi" style="background:#fff;padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione('Il nostro menu', 'Assapora le nostre specialità')}
-      <div class="sv-menu" style="margin-top:1.6rem">${contenuti.piatti.map((p) =>
-        `<div class="sv-riga"><div style="flex:1;min-width:0"><strong style="font-size:1.05rem">${esc(p.nome)}</strong><div style="opacity:.72;font-size:.92rem">${esc(p.descrizione)}</div></div><span class="sv-dots"></span><strong style="color:${palette.primaria};white-space:nowrap">${esc(p.prezzo)}</strong></div>`).join('')}</div></div></section>`;
+    if (famiglia === 'vetrina') {
+      return `<section id="servizi" class="rv" style="background:#fff;color:${TS};padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione(numero, 'Il nostro menu', 'I piatti più amati')}
+        ${griglia(contenuti.piatti.map((p, i) => cardFoto(p.nome, p.descrizione, `<strong style="display:inline-block;margin-top:.6rem">${esc(p.prezzo)}</strong>`, i)).join(''))}</div></section>`;
+    }
+    return `<section id="servizi" class="rv" style="background:#fff;color:${TS};padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione(numero, 'Il nostro menu', 'Assapora le nostre specialità')}${menuElegante(contenuti.piatti)}</div></section>`;
   }
   if (categoria === 'attivita-locale' && contenuti.servizi) {
-    return `<section id="servizi" style="background:#fff;padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione('I nostri servizi', 'Cosa possiamo fare per te')}
+    if (famiglia === 'elegante') {
+      return `<section id="servizi" class="rv" style="background:#fff;color:${TS};padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione(numero, 'I nostri servizi', 'Cosa possiamo fare per te')}
+        <div style="margin-top:1.6rem">${contenuti.servizi.map((s, i) =>
+          `<div style="display:flex;gap:1.2rem;padding:1.1rem 0;border-bottom:1px solid rgba(0,0,0,.12)"><span style="font-weight:700;color:${palette.primaria}">${String(i + 1).padStart(2, '0')}</span><div><strong style="font-size:1.05rem">${esc(s.nome)}</strong><div style="opacity:.75">${esc(s.descrizione)}</div></div></div>`).join('')}</div></div></section>`;
+    }
+    return `<section id="servizi" class="rv" style="background:#fff;color:${TS};padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione(numero, 'I nostri servizi', 'Cosa possiamo fare per te')}
       ${griglia(contenuti.servizi.map((s, i) =>
         `<div class="sv-card" style="background:${palette.sfondo};border:1px solid rgba(0,0,0,.06);border-radius:16px;padding:1.6rem"><span class="sv-check">${i + 1}</span><h3 style="margin:.9rem 0 .5rem;color:${palette.primaria}">${esc(s.nome)}</h3><p style="margin:0">${esc(s.descrizione)}</p></div>`).join(''))}</div></section>`;
   }
   if (categoria === 'freelance-portfolio' && contenuti.progetti) {
-    return `<section id="servizi" style="background:#fff;padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione(contenuti.ruolo || 'Portfolio', 'Progetti selezionati')}
+    if (famiglia === 'elegante') {
+      return `<section id="servizi" class="rv" style="background:#fff;color:${TS};padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione(numero, contenuti.ruolo || 'Portfolio', 'Percorso e progetti')}
+        <p style="max-width:720px;margin:1.2rem 0 0">${esc(contenuti.bio || '')}</p>
+        <div style="margin-top:1.8rem;border-left:2px solid ${palette.accento};padding-left:1.4rem">${contenuti.progetti.map((p) =>
+          `<div style="position:relative;padding:0 0 1.4rem"><span style="position:absolute;left:calc(-1.4rem - 6px);top:.35rem;width:10px;height:10px;border-radius:50%;background:${palette.primaria}"></span><strong style="font-size:1.08rem">${esc(p.titolo)}</strong><div style="opacity:.75">${esc(p.descrizione)}</div></div>`).join('')}</div></div></section>`;
+    }
+    return `<section id="servizi" class="rv" style="background:#fff;color:${TS};padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione(numero, contenuti.ruolo || 'Portfolio', 'Progetti selezionati')}
       <p style="max-width:720px;margin:1.2rem 0 0">${esc(contenuti.bio || '')}</p>
       ${griglia(contenuti.progetti.map((p, i) => cardFoto(p.titolo, p.descrizione, '', i)).join(''))}</div></section>`;
   }
   if (categoria === 'e-commerce' && contenuti.prodotti) {
-    return `<section id="servizi" style="background:#fff;padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione('Il catalogo', 'I nostri prodotti')}
+    return `<section id="servizi" class="rv" style="background:#fff;color:${TS};padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione(numero, 'Il catalogo', 'I nostri prodotti')}
       ${griglia(contenuti.prodotti.map((p, i) => cardFoto(p.nome, p.descrizione,
         `<div style="margin-top:.9rem;display:flex;align-items:center;gap:.9rem"><strong style="font-size:1.08rem">${esc(p.prezzo)}</strong><a class="sv-btn" href="mailto:${esc(contenuti.email)}?subject=Ordine: ${esc(p.nome)}" style="${stilePulsante(palette)};padding:.5rem 1.1rem">Ordina</a></div>`, i)).join(''))}</div></section>`;
   }
@@ -456,6 +579,51 @@ function renderSito({ sito, template, contenuti }) {
   };
   const socialHtml = [linkSocial('Instagram', social.instagram, 'https://instagram.com/'), linkSocial('Facebook', social.facebook, 'https://facebook.com/')].filter(Boolean).join(' · ');
   const numeroWa = String(contenuti.whatsapp || '').replace(/\D/g, '');
+  const famiglia = famigliaLayout(template.layout);
+  const TSB = '#22262b'; // testo scuro sulle bande bianche
+  let nSez = 0;
+  const prox = () => ++nSez;
+  const trustHtml = puntiTrust.length ? `<section class="rv" style="background:#fff;color:${TSB};border-bottom:1px solid rgba(0,0,0,.06);padding:1.7rem 0"><div class="sv-wrap"><div class="sv-trust">${puntiTrust.map(([etichettaTrust, valoreTrust]) => `<div><div style="font-size:.72rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:${palette.primaria}">${etichettaTrust}</div><div style="font-weight:600;margin-top:.3rem">${valoreTrust}</div></div>`).join('')}</div></div></section>` : '';
+  const chiSiamoHtml = () => `<section id="chisiamo" class="rv" style="padding:4rem 0 3rem"><div class="sv-wrap">${intestazione(prox(), 'Chi siamo', 'La nostra storia')}<p style="font-size:1.08rem;line-height:1.75;max-width:760px;margin-top:1.4rem">${esc(contenuti.descrizione)}</p></div></section>`;
+  const percheHtml = () => Array.isArray(contenuti.punti_forza) && contenuti.punti_forza.length ? `<section class="rv" style="padding:4rem 0 3rem"><div class="sv-wrap">${intestazione(prox(), 'Perché sceglierci', 'Il nostro impegno')}<div class="sv-pf" style="margin-top:2rem">${contenuti.punti_forza.slice(0, 3).map((p) => `<div class="sv-card" style="background:#fff;color:${TSB};border:1px solid rgba(0,0,0,.07);border-radius:16px;padding:1.6rem;box-shadow:0 4px 14px rgba(15,25,20,.05)"><span class="sv-check">✓</span><p style="margin:.95rem 0 0;font-weight:600;font-size:1.02rem">${esc(p)}</p></div>`).join('')}</div></div></section>` : '';
+  const recensioniHtml = () => {
+    if (!Array.isArray(contenuti.recensioni) || !contenuti.recensioni.length) return '';
+    const card = (r) => `<div class="sv-card" style="background:${palette.sfondo};border:1px solid rgba(0,0,0,.06);border-radius:16px;padding:1.6rem"><div style="color:${palette.accento};letter-spacing:.15em" aria-hidden="true">${'★'.repeat(Math.max(1, Math.min(5, r.stelle || 5)))}</div><p style="font-style:italic;font-size:1.02rem;margin:.8rem 0">“${esc(r.testo)}”</p><strong>${esc(r.nome)}</strong></div>`;
+    const corpoRec = (famiglia === 'prova' || famiglia === 'editoriale')
+      ? `<div class="sv-rec-row">${contenuti.recensioni.slice(0, 6).map(card).join('')}</div>`
+      : `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem;margin-top:2rem">${contenuti.recensioni.slice(0, 6).map(card).join('')}</div>`;
+    return `<section id="recensioni" class="rv" style="background:#fff;color:${TSB};padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione(prox(), 'Recensioni', 'Cosa dicono di noi')}${corpoRec}</div></section>`;
+  };
+  const classeGalleria = String(template.layout).includes('masonry') ? 'sv-masonry'
+    : (famiglia === 'editoriale' || famiglia === 'vetrina') ? 'sv-gal2' : 'sv-gal';
+  const fotoHtml = () => `<section id="foto" class="rv" style="padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione(prox(), 'Galleria', 'Le nostre foto')}<div class="${classeGalleria}" style="margin-top:2rem">${(fotoSito.length > 1 ? fotoSito.slice(1) : fotoSito).map((f) => `<img src="${esc(f)}" alt="" loading="lazy">`).join('')}</div></div></section>`;
+  const faqHtml = () => Array.isArray(contenuti.faq) && contenuti.faq.length ? `<section id="faq" class="rv" style="padding:0 0 3.5rem"><div class="sv-wrap">${intestazione(prox(), 'Aiuto', 'Domande frequenti')}${contenuti.faq.slice(0, 8).map((f, i) => `<details style="background:#fff;color:${TSB};border:1px solid rgba(0,0,0,.07);border-radius:14px;padding:1rem 1.25rem;margin:${i === 0 ? '2rem' : '0'} 0 .75rem"><summary style="font-weight:600;cursor:pointer;padding:.25rem 0">${esc(f.domanda || f.d || '')}</summary><p>${esc(f.risposta || f.r || '')}</p></details>`).join('')}</div></section>` : '';
+  const contattiHtml = () => `<section id="contatti" class="rv" style="background:#fff;color:${TSB};padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione(prox(), 'Contatti', 'Vieni a trovarci')}
+  <p style="line-height:1.8;margin-top:1.6rem">${esc(contenuti.indirizzo)}<br>Telefono: <a href="tel:${esc(contenuti.telefono)}" style="color:${palette.primaria};font-weight:600">${esc(contenuti.telefono)}</a><br>Email: <a href="mailto:${esc(contenuti.email)}" style="color:${palette.primaria};font-weight:600">${esc(contenuti.email)}</a>${contenuti.orari ? `<br>Orari: ${esc(contenuti.orari)}` : ''}</p>
+  ${contenuti.indirizzo ? `<div style="margin:1.5rem 0"><iframe title="Dove siamo: ${esc(contenuti.indirizzo)}" src="https://www.google.com/maps?q=${encodeURIComponent(contenuti.indirizzo)}&output=embed" loading="lazy" style="width:100%;height:300px;border:0;border-radius:14px"></iframe></div>` : ''}
+  <p style="display:flex;gap:.9rem;flex-wrap:wrap"><a class="sv-btn" href="tel:${esc(contenuti.telefono)}" style="${stilePulsante(palette)}">Chiamaci ora</a>${numeroWa ? `<a class="sv-btn" href="https://wa.me/${numeroWa}" target="_blank" rel="noopener" style="${stilePulsante(palette)};background:#22c064">Scrivici su WhatsApp</a>` : ''}</p></div></section>`;
+  const serviziHtml = () => sezioniCategoria(contenuti, palette, template.categoria, fotoSito, prox(), famiglia);
+  // L'ordine delle sezioni cambia con la storia che il layout racconta:
+  // i layout "storia" mettono foto dopo la storia, quelli "prova" aprono
+  // con le recensioni, gli altri seguono il percorso classico.
+  const ordineSezioni = String(template.layout).includes('storia')
+    ? [chiSiamoHtml, fotoHtml, serviziHtml, percheHtml, recensioniHtml, faqHtml, contattiHtml]
+    : famiglia === 'prova'
+      ? [recensioniHtml, chiSiamoHtml, serviziHtml, percheHtml, fotoHtml, faqHtml, contattiHtml]
+      : [chiSiamoHtml, serviziHtml, percheHtml, recensioniHtml, fotoHtml, faqHtml, contattiHtml];
+  const corpo = trustHtml + ordineSezioni.map((f) => f()).join('');
+  const paroleMarquee = (Array.isArray(contenuti.punti_forza) && contenuti.punti_forza.length
+    ? contenuti.punti_forza
+    : [contenuti.tagline, NOMI_CATEGORIE[template.categoria]]).filter(Boolean);
+  const metaMarquee = paroleMarquee.concat(paroleMarquee).map((p) => `<span style="padding:0 1.1rem">${esc(p)} ✦</span>`).join('');
+  const marqueeHtml = (famiglia === 'schermo' || famiglia === 'editoriale' || famiglia === 'minimale') && metaMarquee
+    ? `<div class="sv-marquee" aria-hidden="true"><div class="sv-marquee-in">${metaMarquee}${metaMarquee}</div></div>` : '';
+  const ctaCfgBar = CTA_SITO[template.categoria] || CTA_SITO['attivita-locale'];
+  const ctaHrefBar = ctaCfgBar[1] === 'tel' ? `tel:${esc(contenuti.telefono)}`
+    : ctaCfgBar[1] === 'mail' ? `mailto:${esc(contenuti.email)}` : ctaCfgBar[1];
+  const stickyBar = famiglia === 'azione'
+    ? `<div class="sv-stickybar"><a href="tel:${esc(contenuti.telefono)}" style="${stilePulsante(palette)};background:rgba(255,255,255,.16);color:#fff">Chiama ora</a><a href="${ctaHrefBar}" style="${stilePulsante(palette)}">${ctaCfgBar[0]}</a></div>` : '';
+  const scriptRv = `<script>(function(){try{document.documentElement.classList.add('sv-js');var els=document.querySelectorAll('.rv');if(!('IntersectionObserver' in window)||!els.length){els.forEach(function(e){e.classList.add('in')});return}var io=new IntersectionObserver(function(en){en.forEach(function(x){if(x.isIntersecting){x.target.classList.add('in');io.unobserve(x.target)}})},{threshold:.06});els.forEach(function(e){io.observe(e)})}catch(e){}})();</script>`;
 
   return `<!doctype html>
 <html lang="it">
@@ -493,10 +661,27 @@ img{background:#e8e2d2}
 .sv-navlink:hover{background:rgba(255,255,255,.16)}
 .sv-wa{position:fixed;right:18px;bottom:18px;z-index:40;background:#22c064;color:#fff;font-weight:700;text-decoration:none;padding:.85rem 1.25rem;border-radius:999px;box-shadow:0 10px 24px rgba(0,0,0,.25)}
 .sv-wa:hover{filter:brightness(1.06)}
-@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}}
+.sv-js .rv{opacity:0;transform:translateY(26px);transition:opacity .8s ease,transform .8s ease}
+.sv-js .rv.in{opacity:1;transform:none}
+.sv-marquee{overflow:hidden;border-top:1px solid rgba(0,0,0,.14);border-bottom:1px solid rgba(0,0,0,.14);padding:.85rem 0}
+.sv-marquee-in{display:inline-flex;white-space:nowrap;animation:svmar 32s linear infinite;font-weight:700;letter-spacing:.05em}
+@keyframes svmar{to{transform:translateX(-50%)}}
+.sv-rec-row{display:flex;gap:1.25rem;overflow-x:auto;scroll-snap-type:x mandatory;padding:.5rem .2rem 1rem;margin-top:2rem}
+.sv-rec-row>*{flex:0 0 min(340px,84%);scroll-snap-align:start}
+.sv-gal2{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem}
+.sv-gal2 img{width:100%;height:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;display:block;background:#e8e2d2}
+@media(min-width:820px){.sv-gal2{grid-template-columns:repeat(4,1fr)}.sv-gal2 img:first-child{grid-column:span 2;grid-row:span 2;aspect-ratio:auto}}
+.sv-masonry{columns:2}
+@media(min-width:820px){.sv-masonry{columns:3}}
+.sv-masonry img{width:100%;margin:0 0 1rem;border-radius:12px;display:block;background:#e8e2d2}
+.sv-stickybar{display:none}
+@media(max-width:760px){.sv-stickybar{display:flex;gap:.7rem;position:fixed;left:0;right:0;bottom:0;z-index:45;background:${palette.secondaria};padding:.7rem 1rem;box-shadow:0 -6px 18px rgba(0,0,0,.22)}.sv-stickybar a{flex:1;text-align:center}}
+.fam-minimale .sv-card{border-radius:2px!important;box-shadow:none!important}
+.fam-minimale img{border-radius:2px!important}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}.sv-js .rv{opacity:1;transform:none}}
 </style>
 </head>
-<body>
+<body class="fam-${famiglia}">
 <header style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;padding:.8rem 1.5rem;background:${palette.secondaria};color:#fff;position:sticky;top:0;z-index:20;box-shadow:0 2px 12px rgba(0,0,0,.15)">
   <a href="#home" style="display:flex;align-items:center;gap:.65rem;color:#fff;text-decoration:none">
     <span style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:12px;background:${palette.accento};font-weight:700;font-family:'${font}',serif;font-size:1.1rem">${iniziale}</span>
@@ -510,25 +695,19 @@ img{background:#e8e2d2}
   </nav>
   <a href="tel:${esc(contenuti.telefono)}" style="color:#fff;text-decoration:none;font-weight:700">${esc(contenuti.telefono)}</a>
 </header>
-${hero(contenuti, palette, template.layout, fotoSito[0], template.categoria)}
-${puntiTrust.length ? `<section style="background:#fff;border-bottom:1px solid rgba(0,0,0,.06);padding:1.7rem 0"><div class="sv-wrap"><div class="sv-trust">${puntiTrust.map(([etichettaTrust, valoreTrust]) => `<div><div style="font-size:.72rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:${palette.primaria}">${etichettaTrust}</div><div style="font-weight:600;margin-top:.3rem">${valoreTrust}</div></div>`).join('')}</div></div></section>` : ''}
-<section id="chisiamo" style="padding:4rem 0 3rem"><div class="sv-wrap">${intestazione('Chi siamo', 'La nostra storia')}<p style="font-size:1.08rem;line-height:1.75;max-width:760px;margin-top:1.4rem">${esc(contenuti.descrizione)}</p></div></section>
-${sezioniCategoria(contenuti, palette, template.categoria, fotoSito)}
-${Array.isArray(contenuti.punti_forza) && contenuti.punti_forza.length ? `<section style="padding:4rem 0 3rem"><div class="sv-wrap">${intestazione('Perché sceglierci', 'Il nostro impegno')}<div class="sv-pf" style="margin-top:2rem">${contenuti.punti_forza.slice(0, 3).map((p) => `<div class="sv-card" style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:16px;padding:1.6rem;box-shadow:0 4px 14px rgba(15,25,20,.05)"><span class="sv-check">✓</span><p style="margin:.95rem 0 0;font-weight:600;font-size:1.02rem">${esc(p)}</p></div>`).join('')}</div></div></section>` : ''}
-${Array.isArray(contenuti.recensioni) && contenuti.recensioni.length ? `<section id="recensioni" style="background:#fff;padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione('Recensioni', 'Cosa dicono di noi')}<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem;margin-top:2rem">${contenuti.recensioni.slice(0, 6).map((r) => `<div class="sv-card" style="background:${palette.sfondo};border:1px solid rgba(0,0,0,.06);border-radius:16px;padding:1.6rem"><div style="color:${palette.accento};letter-spacing:.15em" aria-hidden="true">${'★'.repeat(Math.max(1, Math.min(5, r.stelle || 5)))}</div><p style="font-style:italic;font-size:1.02rem;margin:.8rem 0">“${esc(r.testo)}”</p><strong>${esc(r.nome)}</strong></div>`).join('')}</div></div></section>` : ''}
-<section id="foto" style="padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione('Galleria', 'Le nostre foto')}<div class="sv-gal" style="margin-top:2rem">${(fotoSito.length > 1 ? fotoSito.slice(1) : fotoSito).map((f) => `<img src="${esc(f)}" alt="" loading="lazy">`).join('')}</div></div></section>
-${Array.isArray(contenuti.faq) && contenuti.faq.length ? `<section id="faq" style="padding:0 0 3.5rem"><div class="sv-wrap">${intestazione('Aiuto', 'Domande frequenti')}${contenuti.faq.slice(0, 8).map((f, i) => `<details style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:14px;padding:1rem 1.25rem;margin:${i === 0 ? '2rem' : '0'} 0 .75rem"><summary style="font-weight:600;cursor:pointer;padding:.25rem 0">${esc(f.domanda || f.d || '')}</summary><p>${esc(f.risposta || f.r || '')}</p></details>`).join('')}</div></section>` : ''}
-<section id="contatti" style="background:#fff;padding:4rem 0 3.5rem"><div class="sv-wrap">${intestazione('Contatti', 'Vieni a trovarci')}
-  <p style="line-height:1.8;margin-top:1.6rem">${esc(contenuti.indirizzo)}<br>Telefono: <a href="tel:${esc(contenuti.telefono)}" style="color:${palette.primaria};font-weight:600">${esc(contenuti.telefono)}</a><br>Email: <a href="mailto:${esc(contenuti.email)}" style="color:${palette.primaria};font-weight:600">${esc(contenuti.email)}</a>${contenuti.orari ? `<br>Orari: ${esc(contenuti.orari)}` : ''}</p>
-  ${contenuti.indirizzo ? `<div style="margin:1.5rem 0"><iframe title="Dove siamo: ${esc(contenuti.indirizzo)}" src="https://www.google.com/maps?q=${encodeURIComponent(contenuti.indirizzo)}&output=embed" loading="lazy" style="width:100%;height:300px;border:0;border-radius:14px"></iframe></div>` : ''}
-  <p style="display:flex;gap:.9rem;flex-wrap:wrap"><a class="sv-btn" href="tel:${esc(contenuti.telefono)}" style="${stilePulsante(palette)}">Chiamaci ora</a>${numeroWa ? `<a class="sv-btn" href="https://wa.me/${numeroWa}" target="_blank" rel="noopener" style="${stilePulsante(palette)};background:#22c064">Scrivici su WhatsApp</a>` : ''}</p></div></section>
-<footer style="background:${palette.secondaria};color:#fff;padding:2.5rem 0 2rem"><div class="sv-wrap" style="display:flex;flex-wrap:wrap;gap:2rem;justify-content:space-between">
+${hero(contenuti, palette, template.layout, fotoSito, template.categoria)}
+${marqueeHtml}
+${corpo}
+<footer style="background:${palette.secondaria};color:#fff;padding:2.8rem 0 2rem"><div class="sv-wrap">
+  <div style="font-family:'${font}',serif;font-size:clamp(2.4rem,7.5vw,4.6rem);line-height:1.02;font-weight:700;margin-bottom:1.8rem">${titolo}</div>
+</div><div class="sv-wrap" style="display:flex;flex-wrap:wrap;gap:2rem;justify-content:space-between">
   <div style="max-width:340px"><strong style="font-size:1.15rem">${titolo}</strong><p style="opacity:.85;margin:.5rem 0 0">${esc(contenuti.tagline)}</p>${socialHtml ? `<p style="margin:.9rem 0 0">${socialHtml}</p>` : ''}</div>
   <div><div style="font-size:.72rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;opacity:.75">Contatti</div><p style="margin:.6rem 0 0;line-height:1.7">${esc(contenuti.indirizzo)}<br><a href="tel:${esc(contenuti.telefono)}" style="color:#fff">${esc(contenuti.telefono)}</a><br><a href="mailto:${esc(contenuti.email)}" style="color:#fff">${esc(contenuti.email)}</a></p></div>
   ${contenuti.orari ? `<div><div style="font-size:.72rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;opacity:.75">Orari</div><p style="margin:.6rem 0 0;line-height:1.7">${esc(contenuti.orari)}</p></div>` : ''}
 </div>
 <div class="sv-wrap" style="margin-top:2rem;padding-top:1.2rem;border-top:1px solid rgba(255,255,255,.18);font-size:.85rem;opacity:.75">Sito creato con Sitevaro · Template ${esc(template.nome)}</div></footer>
-${numeroWa ? `<a class="sv-wa" href="https://wa.me/${numeroWa}" target="_blank" rel="noopener">Scrivici su WhatsApp</a>` : ''}
+${numeroWa ? `<a class="sv-wa" href="https://wa.me/${numeroWa}" target="_blank" rel="noopener">Scrivici su WhatsApp</a>` : ''}${stickyBar}
+${scriptRv}
 </body>
 </html>`;
 }

@@ -205,6 +205,39 @@
     .template-shot.layout-9 .mini-visual { height: 98px; }
     .template-shot.layout-9 .mini-layout::after { content: ""; display: block; height: 70px; border-radius: var(--mini-radius, 10px); background: var(--tp3); opacity: .84; }
     .template-shot.is-large { height: clamp(270px, 43vw, 430px); }
+    /* Famiglie di design: l'anteprima rispecchia il sito vero che il server crea */
+    .mini-schermo { position: relative; min-height: 128px; display: flex; align-items: flex-end; padding: 14px; background: linear-gradient(135deg, var(--tp1), var(--tp3)); color: var(--tp2); }
+    .mini-schermo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(rgba(0,0,0,.05), rgba(0,0,0,.55)); }
+    .mini-schermo-copy { position: relative; z-index: 1; }
+    .mini-schermo-copy small { display: block; font: 700 7px/1 "DM Sans", sans-serif; text-transform: uppercase; letter-spacing: .12em; opacity: .85; margin-bottom: 6px; }
+    .mini-schermo-copy b { display: block; font-size: 22px; line-height: .95; max-width: 210px; }
+    .template-shot.fam-schermo { background: var(--tp1); color: var(--tp2); }
+    .template-shot.fam-schermo .mini-nav { background: transparent; color: var(--tp2); border-color: color-mix(in srgb, var(--tp2) 22%, transparent); }
+    .template-shot.fam-schermo .mini-features { display: none; }
+    .mini-panel { background: #fff; color: #22262b; border-radius: var(--mini-radius, 16px); padding: 10px 12px; box-shadow: 0 10px 22px rgba(15,25,20,.16); }
+    .mini-panel small { display: block; font: 700 6.5px/1 "DM Sans", sans-serif; text-transform: uppercase; letter-spacing: .12em; color: var(--tp3); }
+    .mini-panel b { display: block; font-size: 11px; margin: 5px 0 2px; }
+    .mini-prova { grid-template-columns: 1fr; text-align: center; justify-items: center; }
+    .mini-prova .mini-copy { text-align: center; }
+    .mini-stars { color: var(--tp3); letter-spacing: .25em; font-size: 9px; margin-bottom: 6px; }
+    .mini-quote { font-style: italic; }
+    .mini-elegante { grid-template-columns: 1fr .8fr; }
+    .mini-elegante .mini-copy { border-top: 1px solid currentColor; border-bottom: 1px solid currentColor; padding: 9px 2px; }
+    .mini-minimale { grid-template-columns: 1fr; }
+    .mini-minimale .mini-copy b { font-size: 26px; text-transform: uppercase; max-width: 230px; }
+    .mini-vetrina { grid-template-columns: 1fr; align-items: start; gap: 8px; }
+    .mini-vetrina .mini-visual { height: 58px; width: 100%; }
+    .mini-chips { display: flex; gap: 4px; }
+    .mini-chips i { height: 10px; flex: 1; border: 1px solid color-mix(in srgb, var(--tp1) 35%, transparent); border-radius: 99px; }
+    .mini-visual-wrap { position: relative; }
+    .mini-chip { position: absolute; left: 6px; bottom: 6px; background: var(--tp3); color: var(--tp2); font: 700 6.5px/1 "DM Sans", sans-serif; padding: 3px 6px; border-radius: 3px; }
+    .template-shot.is-large .mini-schermo { min-height: 280px; padding: 30px; }
+    .template-shot.is-large .mini-schermo-copy b { font-size: clamp(30px, 4.5vw, 44px); max-width: 380px; }
+    .template-shot.is-large .mini-copy b { font-size: 29px; max-width: 300px; }
+    .template-shot.is-large .mini-copy p { font-size: 10px; max-width: 240px; }
+    .template-shot.is-large .mini-panel b { font-size: 16px; }
+    .template-shot.is-large .mini-panel { padding: 16px 18px; }
+    .template-shot.is-large .mini-vetrina .mini-visual { height: 150px; }
     .template-shot.is-large .mini-nav { height: 50px; padding-inline: 22px; font-size: 12px; }
     .template-shot.is-large .mini-links i { width: 32px; height: 4px; }
     .template-shot.is-large .mini-layout { min-height: 280px; padding: 35px 34px 22px; gap: 24px; }
@@ -1142,6 +1175,28 @@
         'Freelance': { label: 'Progetti', voci: [['Brand per caffetteria', 'Identità visiva e sito'], ['Shop per artigiano', 'E-commerce su misura'], ['Campagna social', 'Foto e contenuti'], ['Restyling studio', 'Sito vetrina']] },
         'E-commerce': { label: 'Prodotti', voci: [['Maglietta basic', '€29'], ['Sneakers urban', '€89'], ['Zaino in pelle', '€119'], ['Orologio minimal', '€149']] }
       };
+      // La famiglia visiva dell'anteprima è la stessa che il server userà
+      // per il sito vero: ciò che il cliente vede qui è ciò che riceve.
+      function famigliaPreview(item) {
+        var raw = String((item && item._layoutRaw) || '').toLowerCase();
+        if (raw) {
+          if (raw.indexOf('fullscreen') !== -1) return 'schermo';
+          if (raw.indexOf('minimal') !== -1) return 'minimale';
+          if (['hero-split', 'hero-personale', 'storia-e-foto', 'chi-siamo-storia', 'lookbook', 'serata-eventi', 'blog-evidenza'].indexOf(raw) !== -1) return 'editoriale';
+          if (['prenota-subito', 'prenota-online', 'contatto-diretto', 'checkout-semplice', 'menu-in-evidenza', 'hero-mappa', 'orari-e-contatti'].indexOf(raw) !== -1) return 'azione';
+          if (['griglia-piatti', 'servizi-griglia', 'portfolio-griglia', 'portfolio-masonry', 'griglia-prodotti', 'categorie-shop', 'offerte-lampo', 'galleria-lavori', 'vetrina-hero'].indexOf(raw) !== -1) return 'vetrina';
+          if (['lista-menu-elegante', 'servizi-lista', 'servizi-e-prezzi', 'cv-timeline'].indexOf(raw) !== -1) return 'elegante';
+          if (['recensioni-evidenza', 'testimonianze', 'recensioni-prodotti'].indexOf(raw) !== -1) return 'prova';
+          return 'centrato';
+        }
+        return ['centrato', 'editoriale', 'schermo', 'elegante', 'vetrina', 'elegante', 'editoriale', 'minimale', 'azione', 'vetrina'][item.layout % 10] || 'centrato';
+      }
+      var nomiFamiglia = {
+        schermo: 'Design a tutto schermo', editoriale: 'Stile editoriale',
+        azione: 'Prenotazione in primo piano', vetrina: 'Vetrina visiva',
+        prova: 'Recensioni in primo piano', elegante: 'Lista elegante',
+        minimale: 'Minimale estremo', centrato: 'Classico centrato'
+      };
       function templateShot(item, large) {
         var content = contentSet[item.category];
         var colors = palettes[item.palette];
@@ -1151,6 +1206,26 @@
           ? '<div class="mini-visual has-photo" style="background-image:url(\'' + item._foto + '\')" aria-hidden="true"></div>'
           : '<div class="mini-visual" aria-hidden="true"></div>';
         var pagine = '';
+        var fam = famigliaPreview(item);
+        var fotoStyle = item._foto ? 'background-image:url(\'' + item._foto + '\');background-size:cover;background-position:center;' : '';
+        var corpoHome;
+        if (fam === 'schermo') {
+          corpoHome = '<div class="mini-schermo" style="' + fotoStyle + '"><div class="mini-schermo-copy"><small>' + content.eyebrow + '</small><b>' + content.title + '</b><span class="mini-cta">' + ctaText + '</span></div></div>';
+        } else if (fam === 'azione') {
+          corpoHome = '<div class="mini-layout mini-azione"><div class="mini-copy"><small>' + content.eyebrow + '</small><b>' + content.title + '</b><p>' + content.body + '</p></div><div class="mini-panel"><small>' + ctaText + '</small><b>+39 000 000 0000</b><span class="mini-cta">' + ctaText + '</span></div></div>';
+        } else if (fam === 'prova') {
+          corpoHome = '<div class="mini-layout mini-prova"><div class="mini-copy"><small>' + content.eyebrow + '</small><div class="mini-stars">★★★★★</div><b class="mini-quote">“' + content.title + '”</b><span class="mini-cta">' + ctaText + '</span></div></div>';
+        } else if (fam === 'elegante') {
+          corpoHome = '<div class="mini-layout mini-elegante"><div class="mini-copy"><small>' + content.eyebrow + '</small><b>' + content.title + '</b><p>' + content.body + '</p><span class="mini-cta">' + ctaText + '</span></div>' + visual + '</div>';
+        } else if (fam === 'minimale') {
+          corpoHome = '<div class="mini-layout mini-minimale"><div class="mini-copy"><small>' + content.eyebrow + '</small><b>' + String(content.title).toUpperCase() + '</b><span class="mini-cta">' + ctaText + '</span></div></div>';
+        } else if (fam === 'vetrina') {
+          corpoHome = '<div class="mini-layout mini-vetrina"><div class="mini-copy"><small>' + content.eyebrow + '</small><b>' + content.title + '</b></div>' + visual + '<div class="mini-chips"><i></i><i></i><i></i><i></i></div></div>';
+        } else if (fam === 'editoriale') {
+          corpoHome = '<div class="mini-layout mini-editoriale"><div class="mini-copy"><small>' + content.eyebrow + '</small><b>' + content.title + '</b><p>' + content.body + '</p><span class="mini-cta">' + ctaText + '</span></div><div class="mini-visual-wrap">' + visual + '<span class="mini-chip">' + content.category + '</span></div></div>';
+        } else {
+          corpoHome = '<div class="mini-layout"><div class="mini-copy"><small>' + content.eyebrow + '</small><b>' + content.title + '</b><p>' + content.body + '</p><span class="mini-cta">' + ctaText + '</span></div>' + visual + '</div>';
+        }
         if (large) {
           var es = esempiVetrina[item.category] || esempiVetrina['Attività locale'];
           var galleria = [];
@@ -1172,9 +1247,9 @@
             '<div class="mini-pagina" data-pagina="2" hidden><h5>Le nostre foto</h5><div class="mini-foto-grid">' + fotoGrid + '</div></div>' +
             '<div class="mini-pagina" data-pagina="3" hidden><h5>Contatti</h5><p>Via Esempio 1, Milano<br>+39 000 000 0000 · info@esempio.it</p><p>Orari: Lun–Sab 9:00–19:00</p><span class="mini-cta">' + ctaText + '</span></div>';
         }
-        return '<div class="template-shot layout-' + item.layout + ' ' + item.fontClass + (large ? ' is-large' : '') + '" style="--tp1:' + colors[0] + ';--tp2:' + colors[1] + ';--tp3:' + colors[2] + ';--tp4:' + colors[3] + ';--mini-radius:' + item.radius + 'px;' + fontStyle + '">' +
+        return '<div class="template-shot layout-' + item.layout + ' fam-' + fam + ' ' + item.fontClass + (large ? ' is-large' : '') + '" style="--tp1:' + colors[0] + ';--tp2:' + colors[1] + ';--tp3:' + colors[2] + ';--tp4:' + colors[3] + ';--mini-radius:' + item.radius + 'px;' + fontStyle + '">' +
           '<div class="mini-nav"><span>' + content.business + '</span><span class="mini-links"><i></i><i></i><i></i></span></div>' +
-          '<div class="mini-layout"><div class="mini-copy"><small>' + content.eyebrow + '</small><b>' + content.title + '</b><p>' + content.body + '</p><span class="mini-cta">' + ctaText + '</span></div>' + visual + '</div>' +
+          corpoHome +
           '<div class="mini-features"><i></i><i></i><i></i></div>' + pagine + '</div>';
       }
       var templateGrid = document.getElementById('templateGrid');
@@ -1200,7 +1275,7 @@
         } else {
           templateGrid.innerHTML = shown.map(function (item) {
             var name = templateName(item);
-            return '<article class="template-card"><button class="template-open" type="button" data-template-id="' + item.id + '" aria-label="' + gt('open',{name:name}) + '">' + templateShot(item, false) + '<span class="template-card-copy"><span><strong>' + name + '</strong><span>' + item.id + ' · ' + layoutNames[item.layout] + '</span></span><span class="template-arrow" aria-hidden="true">↗</span></span></button></article>';
+            return '<article class="template-card"><button class="template-open" type="button" data-template-id="' + item.id + '" aria-label="' + gt('open',{name:name}) + '">' + templateShot(item, false) + '<span class="template-card-copy"><span><strong>' + name + '</strong><span>' + item.id + ' · ' + nomiFamiglia[famigliaPreview(item)] + '</span></span><span class="template-arrow" aria-hidden="true">↗</span></span></button></article>';
           }).join('');
         }
         templateCount.textContent = gt('shown', { shown: Math.min(shown.length, matches.length), total: matches.length });
@@ -1234,14 +1309,14 @@
         currentTemplate = item;
         lastTemplateTrigger = trigger;
         modalTemplateTitle.textContent = templateName(item);
-        modalTemplateMeta.textContent = item.id + ' · ' + gt('layout') + ' ' + (item.layout + 1) + ': ' + layoutNames[item.layout] + ' · ' + gt('palette') + ' ' + (item.palette + 1);
+        modalTemplateMeta.textContent = item.id + ' · ' + nomiFamiglia[famigliaPreview(item)] + ' · ' + gt('palette') + ' ' + (item.palette + 1);
         modalTemplatePreview.innerHTML = templateShot(item, true);
         modalTemplatePreview.querySelectorAll('.mini-pg-btn').forEach(function (btn) {
           btn.addEventListener('click', function () {
             var pg = btn.getAttribute('data-pg');
             modalTemplatePreview.querySelectorAll('.mini-pg-btn').forEach(function (b) { b.classList.toggle('is-on', b === btn); });
             modalTemplatePreview.querySelectorAll('.mini-pagina').forEach(function (p) { p.hidden = p.getAttribute('data-pagina') !== pg; });
-            var home = modalTemplatePreview.querySelector('.mini-layout');
+            var home = modalTemplatePreview.querySelector('.mini-layout, .mini-schermo');
             var feats = modalTemplatePreview.querySelector('.mini-features');
             if (home) home.style.display = pg === '0' ? '' : 'none';
             if (feats) feats.style.display = pg === '0' ? '' : 'none';
