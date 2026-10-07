@@ -1830,12 +1830,34 @@ app.get('/favicon.svg', (req, res) => {
   res.send(FAVICON_SVG);
 });
 
+// Google AdSense (pubblicità sul sito): si attiva solo se su Render è
+// impostata la variabile ADSENSE_PUBLISHER_ID (es. ca-pub-1234567890...).
+// Senza quella variabile la pagina resta identica a oggi: niente script,
+// niente pubblicità. Il codice va solo nella vetrina Sitevaro, mai nei
+// siti dei clienti. L'ID editore è pubblico (si vede nel sorgente di ogni
+// pagina che mostra annunci), quindi non è un segreto.
+const ADSENSE_ID_RAW = String(process.env.ADSENSE_PUBLISHER_ID || '').trim();
+const ADSENSE_CLIENT = ADSENSE_ID_RAW
+  ? (ADSENSE_ID_RAW.startsWith('ca-') ? ADSENSE_ID_RAW : 'ca-' + ADSENSE_ID_RAW)
+  : '';
+
+app.get('/ads.txt', (req, res) => {
+  if (!ADSENSE_CLIENT) return res.status(404).type('text/plain').send('ads.txt non configurato');
+  const pub = ADSENSE_CLIENT.replace(/^ca-/, '');
+  res.type('text/plain').send(`google.com, ${pub}, DIRECT, f08c47fec0942fa0\n`);
+});
+
 app.get('/', (req, res) => {
   if (!vetrinaHtml) return res.status(503).send('Vetrina non disponibile');
   res.setHeader('Content-Security-Policy',
     "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'");
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.type('html').send(vetrinaHtml);
+  let html = vetrinaHtml;
+  if (ADSENSE_CLIENT) {
+    const snippet = `<meta name="google-adsense-account" content="${ADSENSE_CLIENT}"><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}" crossorigin="anonymous"></script>`;
+    html = html.replace('</head>', snippet + '</head>');
+  }
+  res.type('html').send(html);
 });
 
 app.use('/api/auth', authRoutes);
