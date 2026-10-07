@@ -106,7 +106,7 @@ CREATE INDEX IF NOT EXISTS idx_materiali_sito ON materiali(sito_id);
 
 -- Richieste di generazione sito (nuovo modello senza vetrina template):
 -- il cliente racconta la sua attività con tanti dati e foto, paga, e
--- Sitevaro genera il sito entro 24-48 ore assegnando un design libero.
+-- Sitevaro genera il sito entro 48 ore assegnando un design libero.
 CREATE TABLE IF NOT EXISTS richieste (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   utente_id INTEGER NOT NULL REFERENCES utenti(id),
@@ -1193,7 +1193,7 @@ checkoutRoutes.post('/', richiedeAuth, async (req, res) => {
 checkoutRoutes.get('/successo', (req, res) => {
   res.send(`<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pagamento completato — Sitevaro</title></head>
 <body style="font-family:system-ui,sans-serif;text-align:center;padding:4rem 1rem">
-<h1>🎉 Pagamento completato!</h1><p>Abbiamo ricevuto i tuoi dati: generiamo il tuo sito entro 24-48 ore.</p>
+<h1>🎉 Pagamento completato!</h1><p>Abbiamo ricevuto i tuoi dati: generiamo il tuo sito entro 48 ore.</p>
 <p>Lo trovi nella tua Area cliente su Sitevaro appena è online.</p></body></html>`);
 });
 
